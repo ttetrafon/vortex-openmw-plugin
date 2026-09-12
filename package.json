@@ -20,6 +20,6 @@
     "build-info": "node ./scripts/build-info.ts",
     "dev": "tsc --watch",
     "start": "pnpm build && node dist/index.js",
-    "test-package": "pnpm build && pnpm build-info"
+    "test-package": "pnpm build && pnpm build-info && "
   }
 }

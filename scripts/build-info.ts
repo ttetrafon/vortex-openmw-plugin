@@ -10,6 +10,6 @@ const info: object = {
 };
 
 fs.writeFileSync(
-  "./dist/info.json",
+  "./dist/src/info.json",
   JSON.stringify(info, undefined, 2)
 );
