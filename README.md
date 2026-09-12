@@ -1,1 +1,1 @@
-# vortex-openmw-plugin
+# Vortex OpenMW Extension

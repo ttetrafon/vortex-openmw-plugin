@@ -1,0 +1,23 @@
+{
+  "name": "vortex-openmw-extension",
+  "version": "0.0.0",
+  "author": "ttetrafon@yahoo.gt",
+  "description": "Support modding of OpenMW through Vortex",
+  "repository": "https://github.com/ttetrafon/vortex-openmw-plugin",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "pnpm build && node dist/index.js",
+    "test-package": "pnpm build && "
+  },
+  "devDependencies": {
+    "@types/lodash": "4.17.25",
+    "@types/node": "22.20.2",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "lodash": "^4.18.1"
+  }
+}
