@@ -1,0 +1,26 @@
+{
+  "id": "game-openmw",
+  "name": "OpenMW",
+  "version": "0.0.1",
+  "description": "OpenMW support for Vortex",
+  "author": "ttetrafon",
+  "contributors": [],
+  "license": "MIT",
+  "homepage": "https://github.com/ttetrafon/vortex-openmw-plugin",
+  "bugs": {
+    "url": "https://github.com/ttetrafon/vortex-openmw-plugin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ttetrafon/vortex-openmw-plugin.git"
+  },
+  "engines": {
+    "vortex": ">=1.0.0"
+  },
+  "files": [
+    "index.js",
+    "index.js.map",
+    "index.d.ts",
+    "index.d.ts.map"
+  ]
+}

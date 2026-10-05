@@ -1,25 +1,29 @@
 {
-  "name": "vortex-openmw-extension",
-  "version": "0.0.0",
+  "name": "vortex-openmw-morrowind-extension",
+  "version": "0.0.2",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
   "repository": "https://github.com/ttetrafon/vortex-openmw-plugin",
   "type": "module",
   "license": "MIT",
   "devDependencies": {
+    "@types/bluebird": "",
     "@types/lodash": "4.17.25",
     "@types/node": "26.6.4",
     "typescript": "7.0.2"
   },
   "dependencies": {
     "@nexusmods/vortex-api": "2.7.2",
-    "lodash": "^4.18.1"
+    "bluebird": "",
+    "lodash": "4.18.1"
   },
   "scripts": {
     "build": "tsc",
     "build-info": "node ./scripts/build-info.ts",
+    "deploy-test-extension": "xcopy /E /I dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "dev": "tsc --watch",
     "start": "pnpm build && node dist/index.js",
-    "test-package": "pnpm build && pnpm build-info && "
+    "test-package": "pnpm build && pnpm build-info && mkdir -p \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw\" && cp -r ./dist/* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
+    "test-package-win": "pnpm build && pnpm build-info && pnpm run deploy-test-extension"
   }
 }
