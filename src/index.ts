@@ -1,4 +1,4 @@
-import { types, util, selectors } from "@nexusmods/vortex-api";
+import { types } from "@nexusmods/vortex-api";
 import { Promise } from "bluebird";
 import path from "path";
 

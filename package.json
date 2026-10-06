@@ -1,6 +1,6 @@
 {
   "name": "vortex-openmw-morrowind-extension",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
   "repository": "https://github.com/ttetrafon/vortex-openmw-plugin",
@@ -20,10 +20,9 @@
   "scripts": {
     "build": "tsc",
     "build-info": "node ./scripts/build-info.ts",
-    "deploy-test-extension": "xcopy /E /I dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
+    "deploy-test-extension": "xcopy /E /I /Y dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "dev": "tsc --watch",
     "start": "pnpm build && node dist/index.js",
-    "test-package": "pnpm build && pnpm build-info && mkdir -p \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw\" && cp -r ./dist/* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "test-package-win": "pnpm build && pnpm build-info && pnpm run deploy-test-extension"
   }
 }
