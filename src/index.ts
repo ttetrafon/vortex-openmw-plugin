@@ -1,5 +1,8 @@
 import { types, selectors } from "@nexusmods/vortex-api";
 
+import { openGroupEditor } from "./groups/actions";
+import GroupEditor from "./groups/GroupEditor";
+import { groupsReducer, sessionReducer } from "./groups/reducers";
 import reducer from "./reducers";
 import Settings from "./Settings";
 
@@ -16,6 +19,24 @@ function init(context: types.IExtensionContext) {
     undefined,
     () => selectors.activeGameId(context.api.getState()) === MORROWIND_ID,
     150,
+  );
+
+  context.registerReducer(["persistent", SETTINGS_KEY], groupsReducer);
+  context.registerReducer(["session", SETTINGS_KEY], sessionReducer);
+
+  context.registerDialog("openmw-group-editor", GroupEditor);
+
+  // Button in the Mods page toolbar ("..." menu), only while Morrowind is the active game.
+  context.registerAction(
+    "mod-icons",
+    95,
+    "groups",
+    {},
+    "Manage Groups",
+    () => {
+      context.api.store?.dispatch(openGroupEditor(true) as any);
+    },
+    () => selectors.activeGameId(context.api.getState()) === MORROWIND_ID,
   );
 }
 
