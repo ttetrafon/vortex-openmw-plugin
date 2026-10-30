@@ -6,7 +6,8 @@ const info: object = {
   name: packageJson.name,
   version: packageJson.version,
   author: packageJson.author,
-  description: packageJson.description
+  description: packageJson.description,
+  engines: packageJson.engines,
 };
 
 fs.writeFileSync(

@@ -1,26 +1,50 @@
 {
   "name": "vortex-openmw-morrowind-extension",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
-  "repository": "https://github.com/ttetrafon/vortex-openmw-plugin",
+  "homepage": "https://github.com/ttetrafon/vortex-openmw-plugin",
   "type": "module",
   "license": "MIT",
+  "contributors": [
+    "ttetrafon"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ttetrafon/vortex-openmw-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ttetrafon/vortex-openmw-plugin/issues"
+  },
+  "engines": {
+    "vortex": ">=2.0.0"
+  },
   "devDependencies": {
-    "@types/bluebird": "",
+    "@types/bluebird": "3.5.42",
     "@types/lodash": "4.17.25",
     "@types/node": "26.6.4",
+    "@types/react": "18.3.1",
+    "@types/react-bootstrap": "0.32.29",
+    "@types/react-redux": "^7.1.34",
+    "react": "18.3.1",
+    "react-bootstrap": "0.33.1",
+    "react-i18next": "17.1.9",
+    "react-redux": "7.2.9",
+    "redux-act": "1.8.0",
     "typescript": "7.0.2"
   },
   "dependencies": {
     "@nexusmods/vortex-api": "2.7.2",
-    "bluebird": "",
+    "bluebird": "3.7.2",
     "lodash": "4.18.1"
   },
   "scripts": {
+    "cleanup": "rmdir /s /q \"D:\\Projects\\game-dev\\vortex\\openmw-plugin\\dist\"",
     "build": "tsc",
     "build-info": "node ./scripts/build-info.ts",
     "deploy-test-extension": "xcopy /E /I /Y dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
+    "remove-test-extension": "rmdir /s /q \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
+    "test-deploy": "pnpm run remove-test-extension && pnpm run cleanup && pnpm run build && pnpm run build-info && pnpm run deploy-test-extension",
     "dev": "tsc --watch",
     "start": "pnpm build && node dist/index.js",
     "test-package-win": "pnpm build && pnpm build-info && pnpm run deploy-test-extension"

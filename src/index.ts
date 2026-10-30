@@ -1,26 +1,22 @@
-import { types } from "@nexusmods/vortex-api";
-import { Promise } from "bluebird";
-import path from "path";
+import { types, selectors } from "@nexusmods/vortex-api";
 
-const CATEGORIES = [
-  { id: 'mw-environment', name: 'Environment', folder: 'Environment' },
-  { id: 'mw-creatures', name: 'Creatures', folder: 'Creatures' },
-  { id: 'mw-quests', name: 'Quests', folder: 'Quests' },
-];
+import reducer from "./reducers";
+import Settings from "./Settings";
+
+const SETTINGS_KEY = "openmw";
+const MORROWIND_ID = "morrowind";
 
 function init(context: types.IExtensionContext) {
-  const externalRoot = 'D:\\OneDrive\\Documents\\My Games\\OpenMW\\mods';
+  context.registerReducer(["settings", SETTINGS_KEY], reducer);
 
-  CATEGORIES.forEach((cat, i) => {
-    context.registerModType(
-      cat.id,
-      100 + i,
-      (gameId) => gameId === 'morrowind',
-      () => path.join(externalRoot, cat.folder),
-      () => Promise.resolve(false),
-      { name: cat.name }
-    );
-  });
+  // Shown in the "Mods" tab of the Settings page, only while Morrowind is the active game.
+  context.registerSettings(
+    "Mods",
+    Settings,
+    undefined,
+    () => selectors.activeGameId(context.api.getState()) === MORROWIND_ID,
+    150,
+  );
 }
 
 module.exports = {
