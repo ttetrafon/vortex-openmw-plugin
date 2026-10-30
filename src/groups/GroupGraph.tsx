@@ -3,30 +3,12 @@ import { Button } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 
 import type { ISubgroup } from "./reducers";
+import { sortGroups } from "./sort";
 
 const COLS = 5;
 const X_STEP = 190;
 const Y_STEP = 110;
 const PAD = 70;
-
-/** Order groups so every group comes after the ones it lists in `after`. */
-function sortGroups<T extends ISubgroup>(groups: T[]): T[] {
-  const byName = new Map(groups.map((g) => [g.name, g]));
-  const done = new Set<string>();
-  const result: T[] = [];
-  const visit = (g: T, stack: Set<string>) => {
-    if (done.has(g.name) || stack.has(g.name)) return;
-    stack.add(g.name);
-    g.after.forEach((a) => {
-      const dep = byName.get(a);
-      if (dep !== undefined) visit(dep, stack);
-    });
-    done.add(g.name);
-    result.push(g);
-  };
-  groups.forEach((g) => visit(g, new Set()));
-  return result;
-}
 
 interface IProps {
   groups: ISubgroup[];

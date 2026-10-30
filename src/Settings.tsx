@@ -78,7 +78,7 @@ function Settings(props: IProps) {
               </VFlexLayout.Fixed>
             </VFlexLayout>
             <HelpBlock>
-              {t("The location of 'launcher.cfg' and 'openmw.cfg' files for the current user")}
+              {t("The location of 'launcher.cfg' and 'openmw.cfg' files for the current user.")}
             </HelpBlock>
           </FormGroup>
         </Panel.Body>

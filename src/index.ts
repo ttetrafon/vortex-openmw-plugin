@@ -1,6 +1,7 @@
 import { types, selectors } from "@nexusmods/vortex-api";
 
 import { openGroupEditor } from "./groups/actions";
+import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
 import reducer from "./reducers";
@@ -25,6 +26,7 @@ function init(context: types.IExtensionContext) {
   context.registerReducer(["session", SETTINGS_KEY], sessionReducer);
 
   context.registerDialog("openmw-group-editor", GroupEditor);
+  registerGroupColumns(context, MORROWIND_ID);
 
   // Button in the Mods page toolbar ("..." menu), only while Morrowind is the active game.
   context.registerAction(
