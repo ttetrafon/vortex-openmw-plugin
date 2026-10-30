@@ -12,11 +12,11 @@ const MORROWIND_ID = "morrowind";
 function init(context: types.IExtensionContext) {
   context.registerReducer(["settings", SETTINGS_KEY], reducer);
 
-  // Shown in the "Mods" tab of the Settings page, only while Morrowind is the active game.
+  // Own "OpenMW" tab on the Settings page, only while Morrowind is the active game.
   context.registerSettings(
-    "Mods",
+    "OpenMW",
     Settings,
-    undefined,
+    () => ({ api: context.api }),
     () => selectors.activeGameId(context.api.getState()) === MORROWIND_ID,
     150,
   );
