@@ -1,6 +1,8 @@
 import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
 import type { IGroup, ISubgroup } from "./reducers";
-import { attrOf, getModPositions, GROUP_ATTR, SORTING_ATTR, SUBGROUP_ATTR } from "./order";
+import { setExternalPluginSettings } from "../actions";
+import { attrOf, getModPositions, GROUP_ATTR, sortingGroupsOf, SORTING_ATTR, subgroupsOf, SUBGROUP_ATTR, validValues } from "./order";
+import ValueSelect from "./ValueSelect";
 import { sortGroups } from "./sort";
 
 
@@ -23,37 +25,6 @@ function injectColumnStyle() {
     .map((id) => `.header-${id}, .cell-${id} { min-width: ${MIN_COLUMN_WIDTH}px; }`)
     .join("\n");
   document.head.appendChild(style);
-}
-
-interface ISelectProps {
-  value: string;
-  options: string[];
-  disabled: boolean;
-  noneLabel: string;
-  onChange: (value: string) => void;
-}
-
-function ValueSelect(props: ISelectProps) {
-  const { value, options, disabled, noneLabel, onChange } = props;
-  // keep a value whose group/subgroup was deleted visible, so it can still be seen and cleared
-  const all = value !== "" && !options.includes(value) ? [value, ...options] : options;
-  return (
-    <select
-      className="form-control"
-      value={value}
-      disabled={disabled}
-      onChange={(evt) => onChange(evt.target.value)}
-      // don't let clicks select/open the table row
-      onClick={(evt) => evt.stopPropagation()}
-    >
-      <option value="">{noneLabel}</option>
-      {all.map((name) => (
-        <option key={name} value={name}>
-          {name}
-        </option>
-      ))}
-    </select>
-  );
 }
 
 export function registerGroupColumns(context: types.IExtensionContext, gameId: string) {
@@ -106,28 +77,6 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
       [SORTING_ATTR]: custom[SORTING_ATTR],
     });
   });
-
-  const subgroupsOf = (groups: IGroup[], group: string): ISubgroup[] =>
-    groups.find((g) => g.name === group)?.subgroups ?? [];
-
-  const sortingGroupsOf = (groups: IGroup[], group: string, subgroup: string): ISubgroup[] =>
-    subgroupsOf(groups, group).find((s) => s.name === subgroup)?.sortingGroups ?? [];
-
-  /**
-   * The group, subgroup and sorting group with the ones that don't exist any more removed. A subgroup only makes sense within its group, a sorting group within its subgroup.
-   */
-  const validValues = (
-    groups: IGroup[],
-    values: { [attr: string]: string },
-  ): { [attr: string]: string } => {
-    const group = values[GROUP_ATTR] ?? "";
-    const subgroup = values[SUBGROUP_ATTR] ?? "";
-    const sorting = values[SORTING_ATTR] ?? "";
-    const g = groups.some((x) => x.name === group) ? group : "";
-    const s = g !== "" && subgroupsOf(groups, g).some((x) => x.name === subgroup) ? subgroup : "";
-    const o = s !== "" && sortingGroupsOf(groups, g, s).some((x) => x.name === sorting) ? sorting : "";
-    return { [GROUP_ATTR]: g, [SUBGROUP_ATTR]: s, [SORTING_ATTR]: o };
-  };
 
   const valuesOf = (mod: IModRow): { [attr: string]: string } => ({
     [GROUP_ATTR]: attrOf(mod, GROUP_ATTR),
@@ -217,6 +166,22 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
       if (withMod.has(archiveId) || custom === undefined) return;
       const current = valuesOf({ id: archiveId, attributes: custom });
       updates.push(...downloadUpdates(archiveId, validValues(groups, current)));
+    });
+    // the external plugins have their groups too
+    const externalSettings: { [plugin: string]: { [key: string]: any } } = util.getSafe(
+      state,
+      ["persistent", "openmw", "externalSettings"],
+      {},
+    );
+    Object.keys(externalSettings).forEach((plugin) => {
+      const valid = validValues(groups, externalSettings[plugin]!);
+      const changed: { [key: string]: string } = {};
+      Object.keys(valid).forEach((key) => {
+        if (valid[key] !== (externalSettings[plugin]![key] ?? "")) changed[key] = valid[key]!;
+      });
+      if (Object.keys(changed).length > 0) {
+        updates.push(setExternalPluginSettings(plugin, changed));
+      }
     });
     dispatchAll(updates);
   };

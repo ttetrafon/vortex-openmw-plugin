@@ -96,6 +96,11 @@ export const groupsReducer: types.IReducerSpec = {
     [actions.resetGroups as any]: (state) => util.setSafe(state, ["groups"], defaultGroups),
     [actions.setExternalPlugins as any]: (state, plugins: string[]) =>
       util.setSafe(state, ["external"], plugins),
+    [actions.setExternalPluginSettings as any]: (state, { plugin, values }) =>
+      util.setSafe(state, ["externalSettings", plugin.toLowerCase()], {
+        ...(state.externalSettings?.[plugin.toLowerCase()] ?? {}),
+        ...values,
+      }),
     [actions.setExternalArchives as any]: (state, archives: string[]) =>
       util.setSafe(state, ["externalArchives"], archives),
     [actions.setPluginRules as any]: (state, { modId, rules }) =>
@@ -111,6 +116,8 @@ export const groupsReducer: types.IReducerSpec = {
     external: [],
     // archives used by OpenMW that don't come from a mod in Vortex, in load order
     externalArchives: [],
+    // per external plugin (by lowercase file name): enabled, and its group, subgroup and sorting group
+    externalSettings: {},
   },
 };
 

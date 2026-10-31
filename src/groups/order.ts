@@ -1,5 +1,7 @@
 import { util } from "@nexusmods/vortex-api";
 
+import type { IGroup, ISubgroup } from "./reducers";
+
 export const GROUP_ATTR = "openmwGroup";
 export const SUBGROUP_ATTR = "openmwSubgroup";
 export const SORTING_ATTR = "openmwSortingGroup";
@@ -73,3 +75,28 @@ export function getModPositions(mods: { [id: string]: any }): Map<string, number
   cache = { mods, positions };
   return positions;
 }
+
+export const subgroupsOf = (groups: IGroup[], group: string): ISubgroup[] =>
+  groups.find((g) => g.name === group)?.subgroups ?? [];
+
+export const sortingGroupsOf = (groups: IGroup[], group: string, subgroup: string): ISubgroup[] =>
+  subgroupsOf(groups, group).find((s) => s.name === subgroup)?.sortingGroups ?? [];
+
+/**
+ * The group, subgroup and sorting group (the values of the three attributes) with the ones that
+ * don't exist any more removed. A subgroup only makes sense within its group, a sorting group
+ * within its subgroup.
+ */
+export const validValues = (
+  groups: IGroup[],
+  values: { [attr: string]: unknown },
+): { [attr: string]: string } => {
+  const text = (attr: string): string => (typeof values[attr] === "string" ? (values[attr] as string) : "");
+  const group = text(GROUP_ATTR);
+  const subgroup = text(SUBGROUP_ATTR);
+  const sorting = text(SORTING_ATTR);
+  const g = groups.some((x) => x.name === group) ? group : "";
+  const s = g !== "" && subgroupsOf(groups, g).some((x) => x.name === subgroup) ? subgroup : "";
+  const o = s !== "" && sortingGroupsOf(groups, g, s).some((x) => x.name === sorting) ? sorting : "";
+  return { [GROUP_ATTR]: g, [SUBGROUP_ATTR]: s, [SORTING_ATTR]: o };
+};

@@ -1,17 +1,20 @@
-import { IconBar, MainPage, selectors, types } from "@nexusmods/vortex-api";
+import { IconBar, MainPage, selectors, Toggle, types } from "@nexusmods/vortex-api";
 import path from "path";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
-import { attrOf, getModPositions, GROUP_ATTR, modName, SORTING_ATTR, SUBGROUP_ATTR } from "../groups/order";
+import { setExternalPluginSettings } from "../actions";
+import { attrOf, getModPositions, GROUP_ATTR, modName, SORTING_ATTR, sortingGroupsOf, SUBGROUP_ATTR, subgroupsOf, validValues } from "../groups/order";
 import type { IGroup, ISubgroup } from "../groups/reducers";
 import { sortGroups } from "../groups/sort";
-import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, withDefaults } from "../data/defaults";
+import ValueSelect from "../groups/ValueSelect";
+import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault, withDefaults } from "../data/defaults";
 import { getCachedArchives, getCachedPlugins, orderPlugins, pluginBaseName, scanMod } from "../plugins/scan";
 
 const VMainPage = MainPage as any;
 const VIconBar = IconBar as any;
+const VToggle = Toggle as any;
 
 interface IProps {
   gameId: string;
@@ -21,6 +24,14 @@ interface IEntry {
   key: string;
   plugin: string;
   mod: string;
+  /** an external plugin, shown with controls for its settings instead of a mod name */
+  external?: boolean;
+}
+
+/** What is saved for an external plugin. */
+interface IExternalSettings {
+  enabled?: boolean;
+  [attr: string]: string | boolean | undefined;
 }
 
 const emptyObject = {};
@@ -62,6 +73,16 @@ function OpenMWPage(props: IProps) {
     (s: types.IState) => (s.persistent as any).openmw?.external ?? emptyArray,
   );
   const external = React.useMemo(() => withDefaults(DEFAULT_PLUGINS, storedPlugins), [storedPlugins]);
+  // the external plugins that can be set up, which is all but the ones of the base game
+  const optionalExternal = React.useMemo(
+    () => external.filter((plugin) => !isDefault(DEFAULT_PLUGINS, plugin)),
+    [external],
+  );
+  // saved per plugin by lowercase file name, so they are kept when the import changes the list
+  const externalSettings: { [plugin: string]: IExternalSettings } = useSelector(
+    (s: types.IState) => (s.persistent as any).openmw?.externalSettings ?? emptyObject,
+  );
+  const dispatch = useDispatch();
 
   // the mods that are installed, enabled and have a group
   const listed = React.useMemo(
@@ -91,8 +112,16 @@ function OpenMWPage(props: IProps) {
     };
   }, [listed.join("\n"), installPath]);
 
-  const { sections, archives } = React.useMemo(() => {
+  const { sections, archives, ungrouped } = React.useMemo(() => {
     const positions = getModPositions(mods);
+
+    // the external plugins per group, subgroup and sorting group, in the order of the list
+    const externalBuckets = new Map<string, string[]>();
+    optionalExternal.forEach((plugin) => {
+      const valid = validValues(groups, externalSettings[plugin.toLowerCase()] ?? {});
+      const key = [valid[GROUP_ATTR], valid[SUBGROUP_ATTR], valid[SORTING_ATTR]].join("\u0000");
+      externalBuckets.set(key, [...(externalBuckets.get(key) ?? []), plugin]);
+    });
 
     // the listed mods per group, subgroup and sorting group, in the order of their rules
     const buckets = new Map<string, string[]>();
@@ -114,13 +143,18 @@ function OpenMWPage(props: IProps) {
             archives.push({ key: `${id}|${archive}`, plugin: archive, mod: modName(mods[id], id) }),
           ),
       );
-      return ids.flatMap((id) =>
+      const ofMods: IEntry[] = ids.flatMap((id) =>
         orderPlugins(getCachedPlugins(id) ?? [], pluginRules[id]).map((plugin) => ({
           key: `${id}|${plugin}`,
           plugin,
           mod: modName(mods[id], id),
         })),
       );
+      // the external plugins of the same group come after the ones of the mods
+      const ofExternal: IEntry[] = (externalBuckets.get([group, subgroup, sorting].join("\u0000")) ?? []).map(
+        (plugin) => ({ key: `external|${plugin}`, plugin, mod: "", external: true }),
+      );
+      return [...ofMods, ...ofExternal];
     };
 
     const result: ISection[] = [];
@@ -148,8 +182,52 @@ function OpenMWPage(props: IProps) {
       }
       return false;
     });
-    return { sections: shown, archives };
-  }, [mods, groups, pluginRules, listed, installPath]);
+    // the external plugins without a group stay in the "external" section
+    const ungrouped = externalBuckets.get(["", "", ""].join("\u0000")) ?? [];
+    return { sections: shown, archives, ungrouped };
+  }, [mods, groups, pluginRules, listed, installPath, optionalExternal, externalSettings]);
+
+  const setSetting = (plugin: string, key: string, value: string) => {
+    const current = externalSettings[plugin.toLowerCase()] ?? {};
+    // a subgroup only makes sense within its group, a sorting group within its subgroup
+    const valid = validValues(groups, { ...current, [key]: value } as { [attr: string]: string });
+    dispatch(setExternalPluginSettings(plugin, valid) as any);
+  };
+
+  /** A plugin that doesn't come from a mod: a toggle, its name and the selectors for its groups. */
+  const renderExternal = (plugin: string, number: number) => {
+    const current = externalSettings[plugin.toLowerCase()] ?? {};
+    const enabled = current.enabled !== false;
+    const valid = validValues(groups, current as { [attr: string]: string });
+    const group = valid[GROUP_ATTR]!;
+    const subgroup = valid[SUBGROUP_ATTR]!;
+    const selector = (key: string, value: string, options: ISubgroup[]) => (
+      <div style={{ width: 200 }}>
+        <ValueSelect
+          value={value}
+          options={sortGroups(options).map((o) => o.name)}
+          disabled={false}
+          noneLabel={t("(none)")}
+          onChange={(v) => setSetting(plugin, key, v)}
+        />
+      </div>
+    );
+    return (
+      <div key={`external|${plugin}`} style={{ display: "flex", gap: 12, padding: "2px 0", alignItems: "center" }}>
+        <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{number}</span>
+        <VToggle
+          checked={enabled}
+          onToggle={(value: boolean) => dispatch(setExternalPluginSettings(plugin, { enabled: value }) as any)}
+        />
+        <span style={{ opacity: enabled ? 1 : 0.5 }}>{plugin}</span>
+        {selector(GROUP_ATTR, group, groups)}
+        {group !== "" ? selector(SUBGROUP_ATTR, subgroup, subgroupsOf(groups, group)) : null}
+        {subgroup !== ""
+          ? selector(SORTING_ATTR, valid[SORTING_ATTR]!, sortingGroupsOf(groups, group, subgroup))
+          : null}
+      </div>
+    );
+  };
 
   let position = 0;
   let archivePosition = 0;
@@ -182,29 +260,33 @@ function OpenMWPage(props: IProps) {
           ))}
           <h1>{t("Plugins")}</h1>
           <h2>{t("EXTERNAL")}</h2>
-          {external.length === 0 ? (
-            <p style={{ opacity: 0.6 }}>{t("No external plugins")}</p>
-          ) : (
-            external.map((plugin) => (
+          {/* the plugins of the base game, then the other external ones that don't have a group */}
+          {external
+            .filter((plugin) => isDefault(DEFAULT_PLUGINS, plugin))
+            .map((plugin) => (
               <div key={plugin} style={{ display: "flex", gap: 12, padding: "2px 0" }}>
                 <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{++position}</span>
                 <span>{plugin}</span>
               </div>
-            ))
-          )}
+            ))}
+          {ungrouped.map((plugin) => renderExternal(plugin, ++position))}
           {sections.map((section) => {
             // groups are h2 now, as the plugins are a section of their own below the h1 "Plugins"
             const Heading = `h${section.level + 1}` as "h2" | "h3" | "h4";
             return (
               <div key={section.key}>
                 <Heading>{section.title}</Heading>
-                {section.entries.map((entry) => (
-                  <div key={entry.key} style={{ display: "flex", gap: 12, padding: "2px 0" }}>
-                    <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{++position}</span>
-                    <span>{pluginBaseName(entry.plugin)}</span>
-                    <span style={{ opacity: 0.6 }}>{entry.mod}</span>
-                  </div>
-                ))}
+                {section.entries.map((entry) =>
+                  entry.external ? (
+                    renderExternal(entry.plugin, ++position)
+                  ) : (
+                    <div key={entry.key} style={{ display: "flex", gap: 12, padding: "2px 0" }}>
+                      <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{++position}</span>
+                      <span>{pluginBaseName(entry.plugin)}</span>
+                      <span style={{ opacity: 0.6 }}>{entry.mod}</span>
+                    </div>
+                  ),
+                )}
               </div>
             );
           })}
