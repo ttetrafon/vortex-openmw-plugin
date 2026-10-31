@@ -2,6 +2,7 @@ import { types, util } from "@nexusmods/vortex-api";
 import { promises as fs } from "fs";
 import path from "path";
 
+import { setCurrentProfile } from "../actions";
 import { getImportedData } from "./importLoadOrder";
 import { parseActivePlugins, writeProfile } from "./launcherCfg";
 
@@ -50,6 +51,8 @@ export async function exportLoadOrder(api: types.IExtensionApi): Promise<void> {
     await fs.copyFile(file, backup, 1 /* COPYFILE_EXCL: don't overwrite an older backup */).catch(() => undefined);
 
     await fs.writeFile(file, writeProfile(text, EXPORT_PROFILE, { data, ...latest }), "utf8");
+    // launcher.cfg names this profile as the current one now
+    api.store?.dispatch(setCurrentProfile(EXPORT_PROFILE) as any);
     api.sendNotification?.({
       id: "openmw-export-done",
       type: "success",

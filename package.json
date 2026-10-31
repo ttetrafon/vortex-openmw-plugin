@@ -1,6 +1,6 @@
 {
   "name": "vortex-openmw-morrowind-extension",
-  "version": "0.0.18",
+  "version": "0.0.20",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
   "homepage": "https://github.com/ttetrafon/vortex-openmw-plugin",
@@ -41,8 +41,9 @@
   "scripts": {
     "dev": "tsc --watch",
     "cleanup": "rmdir /s /q \"D:\\Projects\\game-dev\\vortex\\openmw-plugin\\dist\"",
-    "build": "tsc",
+    "build": "pnpm install && tsc",
     "build-info": "node ./scripts/build-info.ts",
+    "synchronise-dependencies": "node ./scripts/synchronise-dependencies.ts",
     "deploy-test-extension": "xcopy /E /I /Y dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "remove-test-extension": "rmdir /s /q \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "test-package": "pnpm run remove-test-extension && pnpm run cleanup && pnpm run build && pnpm run build-info && pnpm run deploy-test-extension"

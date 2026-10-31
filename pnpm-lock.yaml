@@ -34,7 +34,7 @@ importers:
         specifier: 0.32.29
         version: 0.32.29
       '@types/react-redux':
-        specifier: ^7.1.34
+        specifier: 7.1.34
         version: 7.1.34
       react:
         specifier: 18.3.1

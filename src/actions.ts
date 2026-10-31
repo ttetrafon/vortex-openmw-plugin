@@ -55,5 +55,7 @@ export const setExternalPluginSettings = make(
   "OPENMW_SET_EXTERNAL_PLUGIN_SETTINGS",
   (plugin: string, values: { [key: string]: string | boolean }) => ({ plugin, values }),
 );
+// the profile of launcher.cfg the load order was read from or written to, only kept for this session
+export const setCurrentProfile = make("OPENMW_SET_CURRENT_PROFILE", (profile: string | undefined) => profile);
 // archives (.bsa) that OpenMW uses but that don't come from a mod in Vortex, in load order
 export const setExternalArchives = make("OPENMW_SET_EXTERNAL_ARCHIVES", (archives: string[]) => archives);

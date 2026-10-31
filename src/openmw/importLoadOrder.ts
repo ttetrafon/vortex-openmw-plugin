@@ -1,7 +1,7 @@
 import { log, selectors, types, util } from "@nexusmods/vortex-api";
 import path from "path";
 
-import { setExternalArchives, setExternalPlugins } from "../actions";
+import { setCurrentProfile, setExternalArchives, setExternalPlugins } from "../actions";
 import { getCachedArchives, pluginBaseName, scanMod } from "../plugins/scan";
 import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault } from "../data/defaults";
 import { readActivePlugins } from "./launcherCfg";
@@ -61,6 +61,7 @@ export async function importLoadOrder(
   }
 
   importedData = active.data;
+  api.store?.dispatch(setCurrentProfile(active.profile) as any);
 
   // every plugin file of every installed mod, whatever its group or state, so that a plugin isn't
   // listed twice once a mod is added

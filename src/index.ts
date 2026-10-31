@@ -4,6 +4,7 @@ import { openGroupEditor } from "./actions";
 import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
+import { deleteLoadOrder } from "./openmw/deleteLoadOrder";
 import { exportLoadOrder } from "./openmw/exportLoadOrder";
 import { importLoadOrder } from "./openmw/importLoadOrder";
 import OpenMWPage from "./openmw/OpenMWPage";
@@ -63,6 +64,18 @@ function init(context: types.IExtensionContext) {
     "Export Load List",
     () => {
       void exportLoadOrder(context.api);
+    },
+  );
+
+  // Button in the toolbar of the OpenMW page, removes the exported load order again
+  context.registerAction(
+    "openmw-icons",
+    120,
+    "delete",
+    {},
+    "Delete Vortex Load Order",
+    () => {
+      void deleteLoadOrder(context.api, MORROWIND_ID);
     },
   );
 

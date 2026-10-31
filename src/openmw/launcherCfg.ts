@@ -132,3 +132,32 @@ export function writeProfile(text: string, name: string, content: IProfileConten
 
   return (hadBom ? "\uFEFF" : "") + kept.join(eol) + (endsWithEol ? eol : "");
 }
+
+/** Whether launcher.cfg has any entry of the profile `name`. */
+export function hasProfile(text: string, name: string): boolean {
+  const prefix = `${name}/`.toLowerCase();
+  return text.split(/\r?\n/).some((line) => {
+    const eq = line.indexOf("=");
+    return eq !== -1 && line.slice(0, eq).trim().toLowerCase().startsWith(prefix);
+  });
+}
+
+/**
+ * Returns the text of launcher.cfg without any entry of the profile `name`. If that profile is the
+ * current one, `fallback` becomes the current profile, otherwise the current profile isn't touched.
+ */
+export function removeProfile(text: string, name: string, fallback: string): string {
+  const prefix = `${name}/`.toLowerCase();
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const isCurrent = new RegExp(`^\\s*currentprofile\\s*=\\s*${escaped}\\s*$`, "i");
+  return text
+    .split(/(?<=\n)/) // every line keeps its own line ending
+    .filter((line) => {
+      const eq = line.indexOf("=");
+      return !(eq !== -1 && line.slice(0, eq).trim().toLowerCase().startsWith(prefix));
+    })
+    .map((line) =>
+      isCurrent.test(line.replace(/\r?\n$/, "")) ? line.replace(/=[^\r\n]*/, `=${fallback}`) : line,
+    )
+    .join("");
+}

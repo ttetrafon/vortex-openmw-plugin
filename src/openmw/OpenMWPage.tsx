@@ -84,6 +84,8 @@ function OpenMWPage(props: IProps) {
     (s: types.IState) => (s.persistent as any).openmw?.externalSettings ?? emptyObject,
   );
   const dispatch = useDispatch();
+  // the profile of launcher.cfg the list below comes from, `undefined` until something was imported
+  const profile: string | undefined = useSelector((s: types.IState) => (s.session as any).openmw?.currentProfile);
 
   // the mods that are installed, enabled and have a group
   const listed = React.useMemo(
@@ -263,6 +265,14 @@ function OpenMWPage(props: IProps) {
       </VMainPage.Header>
       <VMainPage.Body>
         <div className="openmw-plugin-list" style={{ overflow: "auto", height: "100%" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0" }}>
+            <span style={{ opacity: 0.6 }}>{t("Profile")}:</span>
+            <strong>{profile ?? t("Not imported yet")}</strong>
+            {profile === "Vortex" ? <span style={{ opacity: 0.6 }}>({t("exported by Vortex")})</span> : null}
+          </div>
+          <p style={{ fontStyle: "italic", opacity: 0.8, margin: "0 0 8px" }}>
+            {t("If the profile is changed in OpenMW, click Import Load Order to refresh it.")}
+          </p>
           <h1>{t("Archives")}</h1>
           {externalArchives.length === 0 && archives.length === 0 ? (
             <p style={{ opacity: 0.6 }}>{t("No archives")}</p>

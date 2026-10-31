@@ -126,11 +126,14 @@ export const sessionReducer: types.IReducerSpec = {
   reducers: {
     [actions.openGroupEditor as any]: (state, open: boolean) =>
       util.setSafe(state, ["groupEditorOpen"], open),
+    [actions.setCurrentProfile as any]: (state, profile: string | undefined) =>
+      util.setSafe(state, ["currentProfile"], profile),
     [actions.openPluginEditor as any]: (state, modId: string | undefined) =>
       util.setSafe(state, ["pluginEditorMod"], modId),
   },
   defaults: {
     groupEditorOpen: false,
     pluginEditorMod: undefined,
+    currentProfile: undefined,
   },
 };
