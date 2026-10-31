@@ -16,14 +16,18 @@ interface IProps {
   id: string;
   selected?: string | undefined;
   onSelect?: ((name: string | undefined) => void) | undefined;
-  onAdd: (name: string) => void;
-  onRemove: (name: string) => void;
+  /** Without this the input for new nodes isn't shown. */
+  onAdd?: ((name: string) => void) | undefined;
+  /** Without this nodes can't be removed. */
+  onRemove?: ((name: string) => void) | undefined;
   onAddRule: (group: string, after: string) => void;
   onRemoveRule: (group: string, after: string) => void;
+  /** Text shown for a node, defaults to its name. */
+  label?: ((name: string) => string) | undefined;
 }
 
 function GroupGraph(props: IProps) {
-  const { groups, id, selected, onSelect, onAdd, onRemove, onAddRule, onRemoveRule } = props;
+  const { groups, id, selected, onSelect, onAdd, onRemove, onAddRule, onRemoveRule, label } = props;
   const { t } = useTranslation();
   const [newName, setNewName] = React.useState("");
   // used for ctrl+click rules when the parent doesn't track the selection
@@ -49,7 +53,7 @@ function GroupGraph(props: IProps) {
   const add = () => {
     const name = newName.trim();
     if (name.length === 0) return;
-    onAdd(name);
+    onAdd?.(name);
     setNewName("");
   };
 
@@ -103,28 +107,31 @@ function GroupGraph(props: IProps) {
               onClick={(e) => onNodeClick(e, g.name)}
               onContextMenu={(e) => {
                 e.preventDefault();
+                if (onRemove === undefined) return;
                 onRemove(g.name);
                 if (current === g.name) select(undefined);
               }}
             >
               <circle cx={p.x} cy={p.y} r={9} fill={current === g.name ? "#8ab4ff" : "#888"} />
               <text x={p.x} y={p.y - 16} textAnchor="middle" fontSize={14} fill="currentColor">
-                {g.name}
+                {label !== undefined ? label(g.name) : g.name}
               </text>
             </g>
           );
         })}
       </svg>
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <input
-          className="form-control"
-          value={newName}
-          placeholder={t("New group name")}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-        />
-        <Button onClick={add}>{t("Add")}</Button>
-      </div>
+      {onAdd !== undefined ? (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <input
+            className="form-control"
+            value={newName}
+            placeholder={t("New group name")}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
+          />
+          <Button onClick={add}>{t("Add")}</Button>
+        </div>
+      ) : null}
     </div>
   );
 }

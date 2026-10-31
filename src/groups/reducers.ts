@@ -131,9 +131,15 @@ export const groupsReducer: types.IReducerSpec = {
         list.map((g) => (g.name === group ? { ...g, after: g.after.filter((a) => a !== after) } : g)),
       ),
     [actions.resetGroups as any]: (state) => util.setSafe(state, ["groups"], defaultGroups),
+    [actions.setPluginRules as any]: (state, { modId, rules }) =>
+      rules === undefined
+        ? util.deleteOrNop(state, ["pluginRules", modId])
+        : util.setSafe(state, ["pluginRules", modId], rules),
   },
   defaults: {
     groups: defaultGroups,
+    // per mod: the plugin files that load before each plugin file of that mod
+    pluginRules: {},
   },
 };
 
@@ -142,8 +148,11 @@ export const sessionReducer: types.IReducerSpec = {
   reducers: {
     [actions.openGroupEditor as any]: (state, open: boolean) =>
       util.setSafe(state, ["groupEditorOpen"], open),
+    [actions.openPluginEditor as any]: (state, modId: string | undefined) =>
+      util.setSafe(state, ["pluginEditorMod"], modId),
   },
   defaults: {
     groupEditorOpen: false,
+    pluginEditorMod: undefined,
   },
 };

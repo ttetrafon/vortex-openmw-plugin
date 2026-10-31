@@ -4,6 +4,8 @@ import { openGroupEditor } from "./groups/actions";
 import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
+import PluginEditor from "./plugins/PluginEditor";
+import { registerPluginColumn } from "./plugins/column";
 import reducer from "./reducers";
 import Settings from "./Settings";
 
@@ -27,6 +29,9 @@ function init(context: types.IExtensionContext) {
 
   context.registerDialog("openmw-group-editor", GroupEditor);
   registerGroupColumns(context, MORROWIND_ID);
+
+  context.registerDialog("openmw-plugin-editor", PluginEditor, () => ({ gameId: MORROWIND_ID }));
+  registerPluginColumn(context, MORROWIND_ID);
 
   // Button in the Mods page toolbar ("..." menu), only while Morrowind is the active game.
   context.registerAction(

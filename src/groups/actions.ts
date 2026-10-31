@@ -25,4 +25,11 @@ export const removeGroupRule = make(
   "OPENMW_REMOVE_GROUP_RULE",
   (group: string, after: string, parent?: string) => ({ group, after, parent }),
 );
-export const resetGroups = make("OPENMW_RESET_GROUPS", () => undefined);
+// the plugin editor shows the plugin files of one mod, `undefined` closes it
+export const openPluginEditor = make("OPENMW_OPEN_PLUGIN_EDITOR", (modId: string | undefined) => modId);
+// `rules` maps a plugin file to the plugin files that load before it; `undefined` restores the defaults
+export const setPluginRules = make(
+  "OPENMW_SET_PLUGIN_RULES",
+  (modId: string, rules: { [plugin: string]: string[] } | undefined) => ({ modId, rules }),
+);
+export const resetGroups =make("OPENMW_RESET_GROUPS", () => undefined);
