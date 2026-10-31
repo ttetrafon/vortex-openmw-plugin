@@ -12,6 +12,7 @@ const STYLE_ID = "openmw-group-columns-style";
 interface IModRow {
   id: string;
   state?: string;
+  archiveId?: string;
   attributes?: { [key: string]: any };
 }
 
@@ -65,13 +66,50 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
 
   const attrOf = (mod: IModRow, key: string): string => mod?.attributes?.[key] ?? "";
 
-  const setAttrs = (row: IModRow, values: { [key: string]: string }) => {
-    // downloads that aren't installed have no mod entry to attach the value to
-    if (row.state === "downloaded") return;
-    Object.keys(values).forEach((key) => {
-      context.api.store?.dispatch(actions.setModAttribute(gameId, row.id, key, values[key]));
-    });
+  const getDownloads = (): { [archiveId: string]: any } =>
+    util.getSafe(context.api.getState(), ["persistent", "downloads", "files"], {});
+
+  /** Actions that make the values kept with a download match `values`, where they differ. */
+  const downloadUpdates = (archiveId: string, values: { [key: string]: string }): any[] => {
+    const download = getDownloads()[archiveId];
+    if (download === undefined) return [];
+    const custom = download.modInfo?.custom ?? {};
+    return Object.keys(values)
+      .filter((key) => (custom[key] ?? "") !== values[key])
+      .map((key) => actions.setDownloadModInfo(archiveId, `custom.${key}`, values[key]));
   };
+
+  const dispatchAll = (updates: any[]) => {
+    const store = context.api.store;
+    if (updates.length > 0 && store !== undefined) {
+      util.batchDispatch(store, updates);
+    }
+  };
+
+  // The values are kept on the mod and on the download it came from, so that both always agree.
+  // Downloads that aren't installed have no mod entry, their values are only kept with the download
+  // (the row id is the archive id) and read back by the extractor below.
+  const setAttrs = (row: IModRow, values: { [key: string]: string }) => {
+    if (row.state === "downloaded") {
+      dispatchAll(downloadUpdates(row.id, values));
+      return;
+    }
+    dispatchAll([
+      ...Object.keys(values).map((key) => actions.setModAttribute(gameId, row.id, key, values[key])),
+      ...(row.archiveId !== undefined ? downloadUpdates(row.archiveId, values) : []),
+    ]);
+  };
+
+  // Builds the attributes of a downloaded row from what is kept with the download. The same
+  // attributes are used when the download is installed, so the mod keeps its groups.
+  context.registerAttributeExtractor(100, (input: any) => {
+    const custom = input?.download?.modInfo?.custom ?? {};
+    return Promise.resolve({
+      [GROUP_ATTR]: custom[GROUP_ATTR],
+      [SUBGROUP_ATTR]: custom[SUBGROUP_ATTR],
+      [SORTING_ATTR]: custom[SORTING_ATTR],
+    });
+  });
 
   const subgroupsOf = (groups: IGroup[], group: string): ISubgroup[] =>
     groups.find((g) => g.name === group)?.subgroups ?? [];
@@ -220,28 +258,57 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     return (positions.get(lhs.id) ?? 0) - (positions.get(rhs.id) ?? 0);
   };
 
-  // When groups, subgroups or sorting groups are deleted (or reset), clear the values mods still have for them.
+  // When groups, subgroups or sorting groups are deleted (or reset), clear the values mods and
+  // downloads still have for them.
   const clearStaleValues = () => {
     const state = context.api.getState();
     const groups = getGroups();
     const mods: { [id: string]: IModRow } = util.getSafe(state, ["persistent", "mods", gameId], {});
+    const downloads = getDownloads();
     const updates: any[] = [];
+    const withMod = new Set<string>();
     Object.keys(mods).forEach((id) => {
-      const current = valuesOf(mods[id]!);
+      const mod = mods[id]!;
+      const current = valuesOf(mod);
       const valid = validValues(groups, current);
       Object.keys(valid).forEach((key) => {
         if (valid[key] !== current[key]) {
           updates.push(actions.setModAttribute(gameId, id, key, valid[key]));
         }
       });
+      if (mod.archiveId !== undefined) {
+        // the download follows its mod
+        withMod.add(mod.archiveId);
+        updates.push(...downloadUpdates(mod.archiveId, valid));
+      }
     });
-    const store = context.api.store;
-    if (updates.length > 0 && store !== undefined) {
-      util.batchDispatch(store, updates);
-    }
+    Object.keys(downloads).forEach((archiveId) => {
+      const custom = downloads[archiveId]?.modInfo?.custom;
+      if (withMod.has(archiveId) || custom === undefined) return;
+      const current = valuesOf({ id: archiveId, attributes: custom });
+      updates.push(...downloadUpdates(archiveId, validValues(groups, current)));
+    });
+    dispatchAll(updates);
+  };
+
+  // Brings the downloads in line with the values of their installed mods, the mod wins. This fixes
+  // what differs from before the two were kept together.
+  const syncDownloads = () => {
+    const mods: { [id: string]: IModRow } = util.getSafe(
+      context.api.getState(),
+      ["persistent", "mods", gameId],
+      {},
+    );
+    dispatchAll(
+      Object.keys(mods).flatMap((id) => {
+        const archiveId = mods[id]!.archiveId;
+        return archiveId !== undefined ? downloadUpdates(archiveId, valuesOf(mods[id]!)) : [];
+      }),
+    );
   };
 
   context.once(() => {
+    syncDownloads();
     context.api.onStateChange?.(["persistent", "openmw", "groups"], clearStaleValues);
   });
 
@@ -274,7 +341,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
       <ValueSelect
         value={attrOf(mod, GROUP_ATTR)}
         options={sortGroups(getGroups()).map((g) => g.name)}
-        disabled={mod.state === "downloaded"}
+        disabled={false}
         noneLabel={t("(none)")}
         onChange={(value) => setGroup(mod, value)}
       />
@@ -301,7 +368,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
         <ValueSelect
           value={attrOf(mod, SUBGROUP_ATTR)}
           options={sortGroups(group?.subgroups ?? []).map((s) => s.name)}
-          disabled={mod.state === "downloaded" || group === undefined}
+          disabled={group === undefined}
           noneLabel={t("(none)")}
           onChange={(value) => setValue(mod, SUBGROUP_ATTR, value)}
         />
@@ -331,7 +398,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
         <ValueSelect
           value={attrOf(mod, SORTING_ATTR)}
           options={sortGroups(sortingGroupsOf(getGroups(), group, subgroup)).map((s) => s.name)}
-          disabled={mod.state === "downloaded" || subgroupEntry === undefined}
+          disabled={subgroupEntry === undefined}
           noneLabel={t("(none)")}
           onChange={(value) => setValue(mod, SORTING_ATTR, value)}
         />
