@@ -1,5 +1,6 @@
+import * as React from "react";
 import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
-import type { IGroup, ISubgroup } from "./reducers";
+import type { IGroup } from "./reducers";
 import { setExternalPluginSettings } from "../actions";
 import { attrOf, getModPositions, GROUP_ATTR, sortingGroupsOf, SORTING_ATTR, subgroupsOf, SUBGROUP_ATTR, validValues } from "./order";
 import ValueSelect from "./ValueSelect";
@@ -209,6 +210,89 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
 
   const condition = () => selectors.activeGameId(context.api.getState()) === gameId;
 
+  const unassignedOption = () => ({
+    value: OptionsFilter.EMPTY,
+    label: `<${context.api.translate("Unassigned")}>`,
+  });
+
+  /** The values selected in the filter of a column of the mods table, none if it isn't filtering. */
+  const selectedFilter = (attributeId: string): string[] => {
+    const filter = util.getSafe(
+      context.api.getState(),
+      ["settings", "tables", "mods", "filter", attributeId],
+      [],
+    );
+    return Array.isArray(filter) ? filter : [];
+  };
+
+  const uniqueNames = (names: string[]): string[] =>
+    [...new Set(names)].filter((name) => name !== "");
+
+  // Names of the subgroups of the groups selected in the Group filter
+  const filteredSubgroups = (): string[] => {
+    const selected = selectedFilter("openmw-group");
+    return uniqueNames(
+      getGroups()
+        .filter((g) => selected.includes(g.name))
+        .flatMap((g) => sortGroups(g.subgroups ?? []).map((s) => s.name)),
+    );
+  };
+
+  // Names of the sorting groups of the subgroups selected in the Subgroup filter, within the
+  // groups selected in the Group filter
+  const filteredSortingGroups = (): string[] => {
+    const selectedGroups = selectedFilter("openmw-group");
+    const selectedSubgroups = selectedFilter("openmw-subgroup");
+    return uniqueNames(
+      getGroups()
+        .filter((g) => selectedGroups.includes(g.name))
+        .flatMap((g) =>
+          subgroupsOf(getGroups(), g.name)
+            .filter((s) => selectedSubgroups.includes(s.name))
+            .flatMap((s) => sortGroups(sortingGroupsOf(getGroups(), g.name, s.name)).map((x) => x.name)),
+        ),
+    );
+  };
+
+  /**
+   * Multi-select filter like the one of the Group column, with the options taken from the values
+   * nested within the selection of the filter of the column before it. It is disabled (and reset)
+   * while that filter has no selection.
+   */
+  const nestedFilter = (parentId: string, options: () => string[]): OptionsFilter => {
+    const base = new OptionsFilter(
+      () => [unassignedOption(), ...options().map((name) => ({ value: name, label: name }))],
+      true,
+      false,
+    );
+    const BaseComponent = base.component as unknown as React.ComponentType<any>;
+    const NestedComponent = (props: any) => {
+      const [parentFilter, setParentFilter] = React.useState(() => selectedFilter(parentId));
+      React.useEffect(() => {
+        const store = context.api.store;
+        if (store === undefined) return undefined;
+        return store.subscribe(() => {
+          const next = selectedFilter(parentId);
+          setParentFilter((prev) =>
+            prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next,
+          );
+        });
+      }, []);
+      const disabled = parentFilter.length === 0;
+      const hasFilter = Array.isArray(props.filter) && props.filter.length > 0;
+      React.useEffect(() => {
+        if (disabled && hasFilter) props.onSetFilter(props.attributeId, undefined);
+      }, [disabled, hasFilter]);
+      return (
+        <div style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}>
+          <BaseComponent {...props} />
+        </div>
+      );
+    };
+    base.component = NestedComponent as any;
+    return base;
+  };
+
   context.registerTableAttribute("mods", {
     id: "openmw-group",
     name: "Group",
@@ -255,6 +339,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isToggleable: true,
     isSortable: true,
     isVolatile: true,
+    filter: nestedFilter("openmw-group", filteredSubgroups),
     calc: (mod: IModRow) => attrOf(mod, SUBGROUP_ATTR),
     sortFuncRaw: sortByGroupOrder,
     customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => {
@@ -283,6 +368,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isToggleable: true,
     isSortable: true,
     isVolatile: true,
+    filter: nestedFilter("openmw-subgroup", filteredSortingGroups),
     calc: (mod: IModRow) => attrOf(mod, SORTING_ATTR),
     sortFuncRaw: sortByGroupOrder,
     customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => {
