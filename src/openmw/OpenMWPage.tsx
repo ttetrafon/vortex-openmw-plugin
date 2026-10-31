@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { attrOf, getModPositions, GROUP_ATTR, modName, SORTING_ATTR, SUBGROUP_ATTR } from "../groups/order";
 import type { IGroup, ISubgroup } from "../groups/reducers";
 import { sortGroups } from "../groups/sort";
+import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, withDefaults } from "../data/defaults";
 import { getCachedArchives, getCachedPlugins, orderPlugins, pluginBaseName, scanMod } from "../plugins/scan";
 
 const VMainPage = MainPage as any;
@@ -51,13 +52,16 @@ function OpenMWPage(props: IProps) {
     selectors.installPathForGame(s, gameId),
   );
   // archives used by OpenMW that don't come from a mod, see the "Import Load Order" button
-  const externalArchives: string[] = useSelector(
+  const storedArchives: string[] = useSelector(
     (s: types.IState) => (s.persistent as any).openmw?.externalArchives ?? emptyArray,
   );
+  // the archives and plugins of the base game come first, whether launcher.cfg was read or not
+  const externalArchives = React.useMemo(() => withDefaults(DEFAULT_ARCHIVES, storedArchives), [storedArchives]);
   // plugins used by OpenMW that don't come from a mod, see the "Import Load Order" button
-  const external: string[] = useSelector(
+  const storedPlugins: string[] = useSelector(
     (s: types.IState) => (s.persistent as any).openmw?.external ?? emptyArray,
   );
+  const external = React.useMemo(() => withDefaults(DEFAULT_PLUGINS, storedPlugins), [storedPlugins]);
 
   // the mods that are installed, enabled and have a group
   const listed = React.useMemo(

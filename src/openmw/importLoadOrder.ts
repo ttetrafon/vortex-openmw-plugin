@@ -3,6 +3,7 @@ import path from "path";
 
 import { setExternalArchives, setExternalPlugins } from "../actions";
 import { getCachedArchives, pluginBaseName, scanMod } from "../plugins/scan";
+import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault } from "../data/defaults";
 import { readActivePlugins } from "./launcherCfg";
 
 /**
@@ -72,20 +73,21 @@ export async function importLoadOrder(
     );
   }
 
-  const external = active.plugins.filter((plugin) => !known.has(plugin.toLowerCase()));
+  // the base game files are always listed first, so they aren't kept here
+  const optional = active.plugins.filter((plugin) => !isDefault(DEFAULT_PLUGINS, plugin));
+  const optionalArchives = active.archives.filter((archive) => !isDefault(DEFAULT_ARCHIVES, archive));
+  const external = optional.filter((plugin) => !known.has(plugin.toLowerCase()));
   // archives of the profile that no mod provides, the ones of mods are found when showing the list
-  const externalArchives = active.archives.filter((archive) => !knownArchives.has(archive.toLowerCase()));
+  const externalArchives = optionalArchives.filter((archive) => !knownArchives.has(archive.toLowerCase()));
   api.store?.dispatch(setExternalPlugins(external) as any);
   api.store?.dispatch(setExternalArchives(externalArchives) as any);
   if (silent) return;
   api.sendNotification?.({
     id: "openmw-import-done",
     type: "success",
-    message: `Profile '${active.profile}': ${external.length} external plugin(s) and ${
-      externalArchives.length
-    } external archive(s) imported, ${active.plugins.length - external.length} plugin(s) and ${
-      active.archives.length - externalArchives.length
-    } archive(s) already provided by mods in Vortex.`,
+    message: `Profile '${active.profile}': ${external.length} external plugin(s) and ${externalArchives.length
+      } external archive(s) imported, ${optional.length - external.length} plugin(s) and ${optionalArchives.length - externalArchives.length
+      } archive(s) already provided by mods in Vortex.`,
     displayMS: 6000,
   });
 }
