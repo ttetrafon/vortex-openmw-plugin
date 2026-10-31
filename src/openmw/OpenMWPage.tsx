@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 
 import { setExternalPluginSettings } from "../actions";
+import { setLoadOrder } from "./exportLoadOrder";
 import { attrOf, getModPositions, GROUP_ATTR, modName, SORTING_ATTR, sortingGroupsOf, SUBGROUP_ATTR, subgroupsOf, validValues } from "../groups/order";
 import type { IGroup, ISubgroup } from "../groups/reducers";
 import { sortGroups } from "../groups/sort";
@@ -228,6 +229,28 @@ function OpenMWPage(props: IProps) {
       </div>
     );
   };
+
+  // What the Export button writes: the archives and the enabled plugins in the order of this page
+  // (base game files, external ones without a group, then the groups), each file only once.
+  React.useEffect(() => {
+    const unique = (names: string[]): string[] => {
+      const seen = new Set<string>();
+      return names.filter((name) => !seen.has(name.toLowerCase()) && seen.add(name.toLowerCase()));
+    };
+    const isEnabled = (plugin: string) => externalSettings[plugin.toLowerCase()]?.enabled !== false;
+    setLoadOrder({
+      archives: unique([...externalArchives, ...archives.map((entry) => pluginBaseName(entry.plugin))]),
+      plugins: unique([
+        ...external.filter((plugin) => isDefault(DEFAULT_PLUGINS, plugin)),
+        ...ungrouped.filter(isEnabled),
+        ...sections.flatMap((section) =>
+          section.entries
+            .filter((entry) => !entry.external || isEnabled(entry.plugin))
+            .map((entry) => pluginBaseName(entry.plugin)),
+        ),
+      ]),
+    });
+  }, [externalArchives, archives, external, ungrouped, sections, externalSettings]);
 
   let position = 0;
   let archivePosition = 0;

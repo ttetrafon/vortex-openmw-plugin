@@ -4,6 +4,7 @@ import { openGroupEditor } from "./actions";
 import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
+import { exportLoadOrder } from "./openmw/exportLoadOrder";
 import { importLoadOrder } from "./openmw/importLoadOrder";
 import OpenMWPage from "./openmw/OpenMWPage";
 import PluginEditor from "./plugins/PluginEditor";
@@ -49,6 +50,19 @@ function init(context: types.IExtensionContext) {
     "Import Load Order",
     () => {
       void importLoadOrder(context.api, MORROWIND_ID);
+    },
+  );
+
+  // Button in the toolbar of the OpenMW page, writes the load order to launcher.cfg
+  context.registerAction(
+    "openmw-icons",
+    110,
+    // Vortex has no "export" icon, "deploy" is the one that means writing the result out
+    "deploy",
+    {},
+    "Export Load List",
+    () => {
+      void exportLoadOrder(context.api);
     },
   );
 

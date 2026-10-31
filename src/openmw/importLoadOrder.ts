@@ -6,6 +6,14 @@ import { getCachedArchives, pluginBaseName, scanMod } from "../plugins/scan";
 import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault } from "../data/defaults";
 import { readActivePlugins } from "./launcherCfg";
 
+// The data= lines of the profile that was imported last. They are copied as they are when the
+// load order is exported, so they only need to be kept in memory, the import runs at every start.
+let importedData: string[] | undefined;
+
+export function getImportedData(): string[] | undefined {
+  return importedData;
+}
+
 /**
  * Reads the active plugins and archives of the current OpenMW profile and keeps the ones that don't
  * come from any mod installed in Vortex as "External", in the order of launcher.cfg.
@@ -51,6 +59,8 @@ export async function importLoadOrder(
     });
     return;
   }
+
+  importedData = active.data;
 
   // every plugin file of every installed mod, whatever its group or state, so that a plugin isn't
   // listed twice once a mod is added
