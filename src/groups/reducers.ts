@@ -1,68 +1,7 @@
 import { types, util } from "@nexusmods/vortex-api";
 
-import * as actions from "./actions";
-
-export const DEFAULT_GROUP_NAMES = [
-  "MORROWIND",
-  "MASTER",
-  "FIXES & OPTIMISATION",
-  "RESOURCES & FRAMEWORKS",
-  "_Scripting",
-  "_Main Packs",
-  "_Music & Sounds",
-  "_Splash Screens",
-  "_Models & Textures",
-  "_Animations",
-  "_Light",
-  "UNDERRIDES",
-  "EARLY LOADERS",
-  "WORLD",
-  "_General",
-  "_Other",
-  "_Seas",
-  "_Tamriel Rebuilt",
-  "_Skyrim",
-  "_Cyrodiil",
-  "_Vvardenfell",
-  "EQUIPMENT",
-  "_Changes",
-  "_Additions",
-  "CREATURES",
-  "_Base",
-  "_Additions",
-  "_Changes",
-  "FACTIONS",
-  "QUESTING",
-  "_Existing",
-  "_New",
-  "_Patches",
-  "UI",
-  "_General",
-  "_HUD",
-  "_Notifications",
-  "_Icons",
-  "_Journal",
-  "_Map",
-  "_Inventory",
-  "MAGIC",
-  "_Additions",
-  "_Changes",
-  "LOW PRIORITY PATCHES",
-  "LOW PRIORITY OVERRIDES",
-  "GAMEPLAY",
-  "_Exploration",
-  "_Character Creation",
-  "_Character",
-  "_Combat",
-  "_Crime",
-  "_Services",
-  "_Weather",
-  "_Enemies",
-  "LATE PATCHES",
-  "LATE LOADERS",
-  "AUTOMATED",
-  "TOOLS",
-];
+import * as actions from "../actions";
+import { DEFAULT_GROUP_NAMES } from "../data/groups";
 
 /** A group within a parent group. Names only need to be unique within their parent. */
 export interface ISubgroup {
@@ -99,8 +38,7 @@ function buildDefaultGroups(names: string[]): IGroup[] {
 export const defaultGroups: IGroup[] = buildDefaultGroups(DEFAULT_GROUP_NAMES);
 
 /**
- * Applies `fn` to the top-level groups, to the subgroups of `parent` when given or to the sorting
- * groups of the subgroup `subgroup` of `parent` when both are given.
+ * Applies the function to the top-level groups, to the subgroups of `parent` when given or to the sorting groups of the subgroup `subgroup` of `parent` when both are given.
  */
 function updateList(
   state: any,
@@ -115,11 +53,11 @@ function updateList(
     subgroup === undefined
       ? { ...g, subgroups: fn(g.subgroups) }
       : {
-          ...g,
-          subgroups: g.subgroups.map((s) =>
-            s.name === subgroup ? { ...s, sortingGroups: fn(s.sortingGroups ?? []) } : s,
-          ),
-        };
+        ...g,
+        subgroups: g.subgroups.map((s) =>
+          s.name === subgroup ? { ...s, sortingGroups: fn(s.sortingGroups ?? []) } : s,
+        ),
+      };
   return util.setSafe(
     state,
     ["groups"],

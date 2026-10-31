@@ -1,11 +1,9 @@
 import { selectors, tooltip, types } from "@nexusmods/vortex-api";
 import path from "path";
-import React from "react";
 
-import { openPluginEditor } from "../groups/actions";
+import { openPluginEditor } from "../actions";
 import { forgetMod, getCachedPlugins, scanMod } from "./scan";
 
-// vortex-api ships its own React typings, which clash with the local @types/react.
 const VIconButton = tooltip.IconButton as any;
 
 interface IModRow {

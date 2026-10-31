@@ -12,17 +12,13 @@ const PAD = 70;
 
 interface IProps {
   groups: ISubgroup[];
-  /** Part of the SVG marker id, has to be unique per graph on the page. */
   id: string;
   selected?: string | undefined;
   onSelect?: ((name: string | undefined) => void) | undefined;
-  /** Without this the input for new nodes isn't shown. */
   onAdd?: ((name: string) => void) | undefined;
-  /** Without this nodes can't be removed. */
   onRemove?: ((name: string) => void) | undefined;
   onAddRule: (group: string, after: string) => void;
   onRemoveRule: (group: string, after: string) => void;
-  /** Text shown for a node, defaults to its name. */
   label?: ((name: string) => string) | undefined;
 }
 

@@ -11,11 +11,10 @@ import {
   removeGroup,
   removeGroupRule,
   resetGroups,
-} from "./actions";
+} from "../actions";
 import GroupGraph from "./GroupGraph";
 import type { IGroup } from "./reducers";
 
-// vortex-api ships its own React typings, which clash with the local @types/react.
 const VModal = Modal as any;
 
 function GroupEditor() {

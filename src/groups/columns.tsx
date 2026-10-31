@@ -80,8 +80,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     subgroupsOf(groups, group).find((s) => s.name === subgroup)?.sortingGroups ?? [];
 
   /**
-   * The group, subgroup and sorting group with the ones that don't exist any more removed. A
-   * subgroup only makes sense within its group, a sorting group within its subgroup.
+   * The group, subgroup and sorting group with the ones that don't exist any more removed. A subgroup only makes sense within its group, a sorting group within its subgroup.
    */
   const validValues = (
     groups: IGroup[],
@@ -172,8 +171,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
         });
       });
 
-      // Kahn's algorithm, always taking the first available mod by name so unrelated mods stay
-      // in a stable order
+      // Always taking the first available mod by name so unrelated mods stay in a stable order
       const done = new Set<string>();
       const ordered: string[] = [];
       while (ordered.length < ids.length) {
@@ -222,8 +220,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     return (positions.get(lhs.id) ?? 0) - (positions.get(rhs.id) ?? 0);
   };
 
-  // When groups, subgroups or sorting groups are deleted (or reset), clear the values mods still
-  // have for them.
+  // When groups, subgroups or sorting groups are deleted (or reset), clear the values mods still have for them.
   const clearStaleValues = () => {
     const state = context.api.getState();
     const groups = getGroups();
@@ -261,8 +258,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isToggleable: true,
     isSortable: true,
     isVolatile: true,
-    // multi-select dropdown like the one of the Category column; the options are read when it opens,
-    // so they follow edits made in the group editor. raw=false matches on the group name from calc.
+    // multi-select dropdown like the one of the Category column; the options are read when it opens, so they follow edits made in the group editor. raw=false matches on the group name from calc.
     filter: new OptionsFilter(
       () => [
         { value: OptionsFilter.EMPTY, label: `<${context.api.translate("Unassigned")}>` },

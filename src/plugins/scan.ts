@@ -1,9 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 
-const PLUGIN_EXTENSIONS = [".esm", ".esp", ".omwaddon", ".omwscripts", ".omwscript"];
+const PLUGIN_EXTENSIONS = [".esm", ".esp", ".omwaddon", ".omwscript"];
 const ADDON_EXTENSION = ".omwaddon";
-const SCRIPT_EXTENSIONS = [".omwscripts", ".omwscript"];
+const SCRIPT_EXTENSION = ".omwscript";
 
 interface IScanResult {
   /** staging folder the result belongs to, a different one means the mod changed */
@@ -69,7 +69,7 @@ export function defaultPluginRules(plugins: string[]): { [plugin: string]: strin
   const ext = (plugin: string) => path.extname(plugin).toLowerCase();
   const rules: { [plugin: string]: string[] } = {};
   plugins
-    .filter((plugin) => SCRIPT_EXTENSIONS.includes(ext(plugin)))
+    .filter((plugin) => SCRIPT_EXTENSION.includes(ext(plugin)))
     .forEach((script) => {
       const addons = plugins.filter((p) => ext(p) === ADDON_EXTENSION && stem(p) === stem(script));
       if (addons.length > 0) {

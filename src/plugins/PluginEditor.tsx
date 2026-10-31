@@ -4,12 +4,11 @@ import { Button } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 
-import { openPluginEditor, setPluginRules } from "../groups/actions";
+import { openPluginEditor, setPluginRules } from "../actions";
 import GroupGraph from "../groups/GroupGraph";
 import type { ISubgroup } from "../groups/reducers";
 import { defaultPluginRules, getCachedPlugins, pluginBaseName } from "./scan";
 
-// vortex-api ships its own React typings, which clash with the local @types/react.
 const VModal = Modal as any;
 
 interface IProps {

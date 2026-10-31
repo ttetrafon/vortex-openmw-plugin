@@ -1,6 +1,6 @@
 import { types, selectors } from "@nexusmods/vortex-api";
 
-import { openGroupEditor } from "./groups/actions";
+import { openGroupEditor } from "./actions";
 import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
