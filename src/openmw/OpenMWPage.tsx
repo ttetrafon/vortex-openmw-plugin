@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { setExternalPluginSettings } from "../actions";
 import { setLoadOrder } from "./exportLoadOrder";
+import { isMaster } from "./masters";
 import { attrOf, getModPositions, GROUP_ATTR, modName, SORTING_ATTR, sortingGroupsOf, SUBGROUP_ATTR, subgroupsOf, validValues } from "../groups/order";
 import type { IGroup, ISubgroup } from "../groups/reducers";
 import { sortGroups } from "../groups/sort";
@@ -27,6 +28,8 @@ interface IEntry {
   mod: string;
   /** an external plugin, shown with controls for its settings instead of a mod name */
   external?: boolean;
+  /** where a master file comes from, as it isn't listed there */
+  from?: string;
 }
 
 /** What is saved for an external plugin. */
@@ -115,7 +118,7 @@ function OpenMWPage(props: IProps) {
     };
   }, [listed.join("\n"), installPath]);
 
-  const { sections, archives, ungrouped } = React.useMemo(() => {
+  const { sections, masters, archives, ungrouped } = React.useMemo(() => {
     const positions = getModPositions(mods);
 
     // the external plugins per group, subgroup and sorting group, in the order of the list
@@ -177,6 +180,17 @@ function OpenMWPage(props: IProps) {
       });
     });
 
+    // The master files (.esm) are listed right after the External section, whatever their group is,
+    // and remember which one it is. The other plugins stay in their groups.
+    const titles: string[] = [];
+    const masters: IEntry[] = [];
+    result.forEach((section) => {
+      titles[section.level - 1] = section.title;
+      titles.length = section.level;
+      masters.push(...section.entries.filter((entry) => isMaster(entry.plugin)).map((entry) => ({ ...entry, from: titles.join(" / ") })));
+      section.entries = section.entries.filter((entry) => !isMaster(entry.plugin));
+    });
+
     // sections without plugins below them aren't shown, a heading is kept for the ones with plugins somewhere below it
     const shown = result.filter((section, idx) => {
       for (let i = idx; i < result.length; ++i) {
@@ -187,7 +201,7 @@ function OpenMWPage(props: IProps) {
     });
     // the external plugins without a group stay in the "external" section
     const ungrouped = externalBuckets.get(["", "", ""].join("\u0000")) ?? [];
-    return { sections: shown, archives, ungrouped };
+    return { sections: shown, masters, archives, ungrouped };
   }, [mods, groups, pluginRules, listed, installPath, optionalExternal, externalSettings]);
 
   const setSetting = (plugin: string, key: string, value: string) => {
@@ -233,7 +247,8 @@ function OpenMWPage(props: IProps) {
   };
 
   // What the Export button writes: the archives and the enabled plugins in the order of this page
-  // (base game files, external ones without a group, then the groups), each file only once.
+  // (base game files, external ones without a group, master files, then the groups), each file only
+  // once.
   React.useEffect(() => {
     const unique = (names: string[]): string[] => {
       const seen = new Set<string>();
@@ -242,20 +257,34 @@ function OpenMWPage(props: IProps) {
     const isEnabled = (plugin: string) => externalSettings[plugin.toLowerCase()]?.enabled !== false;
     setLoadOrder({
       archives: unique([...externalArchives, ...archives.map((entry) => pluginBaseName(entry.plugin))]),
-      plugins: unique([
-        ...external.filter((plugin) => isDefault(DEFAULT_PLUGINS, plugin)),
-        ...ungrouped.filter(isEnabled),
-        ...sections.flatMap((section) =>
-          section.entries
-            .filter((entry) => !entry.external || isEnabled(entry.plugin))
-            .map((entry) => pluginBaseName(entry.plugin)),
-        ),
-      ]),
+      // the order of this page: the External section, the master files, then the groups
+      plugins: unique(
+        [
+          ...external.filter((plugin) => isDefault(DEFAULT_PLUGINS, plugin)),
+          ...ungrouped.filter(isEnabled),
+          ...masters,
+          ...sections.flatMap((section) => section.entries),
+        ]
+          .filter((entry) => typeof entry === "string" || !entry.external || isEnabled(entry.plugin))
+          .map((entry) => (typeof entry === "string" ? entry : pluginBaseName(entry.plugin))),
+      ),
     });
-  }, [externalArchives, archives, external, ungrouped, sections, externalSettings]);
+  }, [externalArchives, archives, external, ungrouped, masters, sections, externalSettings]);
 
   let position = 0;
   let archivePosition = 0;
+
+  const renderEntry = (entry: IEntry) =>
+    entry.external ? (
+      renderExternal(entry.plugin, ++position)
+    ) : (
+      <div key={entry.key} style={{ display: "flex", gap: 12, padding: "2px 0" }}>
+        <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{++position}</span>
+        <span>{pluginBaseName(entry.plugin)}</span>
+        <span style={{ opacity: 0.6 }}>{entry.mod}</span>
+        {entry.from !== undefined ? <span style={{ opacity: 0.6, fontStyle: "italic" }}>({entry.from})</span> : null}
+      </div>
+    );
 
   return (
     <VMainPage>
@@ -303,23 +332,23 @@ function OpenMWPage(props: IProps) {
               </div>
             ))}
           {ungrouped.map((plugin) => renderExternal(plugin, ++position))}
+          {/* all the .esm files of the groups, as they are exported, between External and the groups */}
+          {masters.length > 0 ? (
+            <div>
+              <h2>{t("MASTER FILES (.esm)")}</h2>
+              <p style={{ fontStyle: "italic", opacity: 0.8, margin: "0 0 4px" }}>
+                {t("All .esm files of the groups load here, before the other plugins. The group they are in is shown in brackets.")}
+              </p>
+              {masters.map(renderEntry)}
+            </div>
+          ) : null}
           {sections.map((section) => {
             // groups are h2 now, as the plugins are a section of their own below the h1 "Plugins"
             const Heading = `h${section.level + 1}` as "h2" | "h3" | "h4";
             return (
               <div key={section.key}>
                 <Heading>{section.title}</Heading>
-                {section.entries.map((entry) =>
-                  entry.external ? (
-                    renderExternal(entry.plugin, ++position)
-                  ) : (
-                    <div key={entry.key} style={{ display: "flex", gap: 12, padding: "2px 0" }}>
-                      <span style={{ opacity: 0.5, minWidth: "3em", textAlign: "right" }}>{++position}</span>
-                      <span>{pluginBaseName(entry.plugin)}</span>
-                      <span style={{ opacity: 0.6 }}>{entry.mod}</span>
-                    </div>
-                  ),
-                )}
+                {section.entries.map(renderEntry)}
               </div>
             );
           })}
