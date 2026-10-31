@@ -8,22 +8,33 @@ const make = <A extends any[]>(type: string, payloadReducer: (...args: A) => unk
   }) & { toString(): string };
 
 // `parent` is the name of the group whose subgroups are changed; omit it to change top-level groups.
+// With `subgroup` as well (a subgroup of `parent`), the sorting groups of that subgroup are changed.
 export const openGroupEditor = make("OPENMW_OPEN_GROUP_EDITOR", (open: boolean) => open);
-export const addGroup = make("OPENMW_ADD_GROUP", (name: string, parent?: string) => ({
-  name,
-  parent,
-}));
-export const removeGroup = make("OPENMW_REMOVE_GROUP", (name: string, parent?: string) => ({
-  name,
-  parent,
-}));
+export const addGroup = make(
+  "OPENMW_ADD_GROUP",
+  (name: string, parent?: string, subgroup?: string) => ({ name, parent, subgroup }),
+);
+export const removeGroup = make(
+  "OPENMW_REMOVE_GROUP",
+  (name: string, parent?: string, subgroup?: string) => ({ name, parent, subgroup }),
+);
 export const addGroupRule = make(
   "OPENMW_ADD_GROUP_RULE",
-  (group: string, after: string, parent?: string) => ({ group, after, parent }),
+  (group: string, after: string, parent?: string, subgroup?: string) => ({
+    group,
+    after,
+    parent,
+    subgroup,
+  }),
 );
 export const removeGroupRule = make(
   "OPENMW_REMOVE_GROUP_RULE",
-  (group: string, after: string, parent?: string) => ({ group, after, parent }),
+  (group: string, after: string, parent?: string, subgroup?: string) => ({
+    group,
+    after,
+    parent,
+    subgroup,
+  }),
 );
 // the plugin editor shows the plugin files of one mod, `undefined` closes it
 export const openPluginEditor = make("OPENMW_OPEN_PLUGIN_EDITOR", (modId: string | undefined) => modId);

@@ -24,9 +24,18 @@ function GroupEditor() {
   const store = useStore();
   const open: boolean = useSelector((s: types.IState) => !!(s.session as any).openmw?.groupEditorOpen);
   const groups: IGroup[] = useSelector((s: types.IState) => (s.persistent as any).openmw?.groups ?? []);
-  const [selected, setSelected] = React.useState<string | undefined>(undefined);
+  const [selected, setSelectedGroup] = React.useState<string | undefined>(undefined);
+  const [selectedSub, setSelectedSub] = React.useState<string | undefined>(undefined);
+
+  // the selected subgroup belongs to the selected group, so changing that one resets it
+  const setSelected = (name: string | undefined) => {
+    setSelectedGroup(name);
+    setSelectedSub(undefined);
+  };
 
   const parent = groups.find((g) => g.name === selected);
+  const subgroup = parent?.subgroups.find((s) => s.name === selectedSub);
+  const path: string = `${parent?.name ?? ""} / ${subgroup?.name ?? ""}`;
   const run = (action: unknown) => dispatch(action as any);
 
   const close = () => run(openGroupEditor(false));
@@ -36,7 +45,7 @@ function GroupEditor() {
       (actions as any).showDialog(
         "question",
         t("Reset Groups"),
-        { text: t("This will remove all your changes to groups and subgroups. This can't be undone!") },
+        { text: t("This will remove all your changes to groups, subgroups and sorting groups. This can't be undone!") },
         [{ label: "Cancel" }, { label: "Reset", default: true }],
       ),
     ).then((result: types.IDialogResult) => {
@@ -78,10 +87,33 @@ function GroupEditor() {
               id="openmw-subgroups"
               key={parent.name}
               groups={parent.subgroups}
+              selected={selectedSub}
+              onSelect={setSelectedSub}
               onAdd={(name) => run(addGroup(name, parent.name))}
               onRemove={(name) => run(removeGroup(name, parent.name))}
               onAddRule={(group, after) => run(addGroupRule(group, after, parent.name))}
               onRemoveRule={(group, after) => run(removeGroupRule(group, after, parent.name))}
+            />
+          </div>
+        )}
+        <hr />
+        {parent === undefined || subgroup === undefined ? (
+          <div>{t("Select a subgroup above to edit its sorting groups.")}</div>
+        ) : (
+          <div>
+            <h5>{t("Sorting groups of {{name}}", { replace: { name: path } })}</h5>
+            <GroupGraph
+              id="openmw-sorting-groups"
+              key={`${parent.name}/${subgroup.name}`}
+              groups={subgroup.sortingGroups ?? []}
+              onAdd={(name) => run(addGroup(name, parent.name, subgroup.name))}
+              onRemove={(name) => run(removeGroup(name, parent.name, subgroup.name))}
+              onAddRule={(group, after) =>
+                run(addGroupRule(group, after, parent.name, subgroup.name))
+              }
+              onRemoveRule={(group, after) =>
+                run(removeGroupRule(group, after, parent.name, subgroup.name))
+              }
             />
           </div>
         )}

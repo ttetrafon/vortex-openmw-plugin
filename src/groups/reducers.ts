@@ -70,6 +70,12 @@ export interface ISubgroup {
   after: string[];
 }
 
+/** A group within a subgroup. Names only need to be unique within their subgroup. */
+export interface ISubgroup {
+  /** Not part of the defaults, only exists once the user adds some. */
+  sortingGroups?: ISubgroup[];
+}
+
 export interface IGroup extends ISubgroup {
   subgroups: ISubgroup[];
 }
@@ -92,42 +98,61 @@ function buildDefaultGroups(names: string[]): IGroup[] {
 
 export const defaultGroups: IGroup[] = buildDefaultGroups(DEFAULT_GROUP_NAMES);
 
-/** Applies `fn` to the top-level groups, or to the subgroups of `parent` when given. */
+/**
+ * Applies `fn` to the top-level groups, to the subgroups of `parent` when given or to the sorting
+ * groups of the subgroup `subgroup` of `parent` when both are given.
+ */
 function updateList(
   state: any,
   parent: string | undefined,
+  subgroup: string | undefined,
   fn: (list: ISubgroup[]) => ISubgroup[],
 ): any {
   if (parent === undefined) {
     return util.setSafe(state, ["groups"], fn(state.groups) as IGroup[]);
   }
+  const inParent = (g: IGroup): IGroup =>
+    subgroup === undefined
+      ? { ...g, subgroups: fn(g.subgroups) }
+      : {
+          ...g,
+          subgroups: g.subgroups.map((s) =>
+            s.name === subgroup ? { ...s, sortingGroups: fn(s.sortingGroups ?? []) } : s,
+          ),
+        };
   return util.setSafe(
     state,
     ["groups"],
-    (state.groups as IGroup[]).map((g) => (g.name === parent ? { ...g, subgroups: fn(g.subgroups) } : g)),
+    (state.groups as IGroup[]).map((g) => (g.name === parent ? inParent(g) : g)),
   );
 }
 
 export const groupsReducer: types.IReducerSpec = {
   reducers: {
-    [actions.addGroup as any]: (state, { name, parent }) =>
-      updateList(state, parent, (list) =>
-        list.some((g) => g.name === name)
-          ? list
-          : [...list, parent === undefined ? { name, after: [], subgroups: [] } : { name, after: [] }],
-      ),
-    [actions.removeGroup as any]: (state, { name, parent }) =>
-      updateList(state, parent, (list) =>
+    [actions.addGroup as any]: (state, { name, parent, subgroup }) =>
+      updateList(state, parent, subgroup, (list) => {
+        if (list.some((g) => g.name === name)) return list;
+        // every level has the groups it contains, except the lowest one
+        const entry: ISubgroup =
+          parent === undefined
+            ? ({ name, after: [], subgroups: [] } as IGroup)
+            : subgroup === undefined
+              ? { name, after: [], sortingGroups: [] }
+              : { name, after: [] };
+        return [...list, entry];
+      }),
+    [actions.removeGroup as any]: (state, { name, parent, subgroup }) =>
+      updateList(state, parent, subgroup, (list) =>
         list.filter((g) => g.name !== name).map((g) => ({ ...g, after: g.after.filter((a) => a !== name) })),
       ),
-    [actions.addGroupRule as any]: (state, { group, after, parent }) =>
-      updateList(state, parent, (list) =>
+    [actions.addGroupRule as any]: (state, { group, after, parent, subgroup }) =>
+      updateList(state, parent, subgroup, (list) =>
         list.map((g) =>
           g.name === group && !g.after.includes(after) ? { ...g, after: [...g.after, after] } : g,
         ),
       ),
-    [actions.removeGroupRule as any]: (state, { group, after, parent }) =>
-      updateList(state, parent, (list) =>
+    [actions.removeGroupRule as any]: (state, { group, after, parent, subgroup }) =>
+      updateList(state, parent, subgroup, (list) =>
         list.map((g) => (g.name === group ? { ...g, after: g.after.filter((a) => a !== after) } : g)),
       ),
     [actions.resetGroups as any]: (state) => util.setSafe(state, ["groups"], defaultGroups),

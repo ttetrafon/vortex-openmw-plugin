@@ -1,9 +1,10 @@
 import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
-import type { IGroup } from "./reducers";
+import type { IGroup, ISubgroup } from "./reducers";
 import { sortGroups } from "./sort";
 
 const GROUP_ATTR = "openmwGroup";
 const SUBGROUP_ATTR = "openmwSubgroup";
+const SORTING_ATTR = "openmwSortingGroup";
 
 const MIN_COLUMN_WIDTH = 220;
 const STYLE_ID = "openmw-group-columns-style";
@@ -16,7 +17,7 @@ interface IModRow {
 
 function injectColumnStyle() {
   if (document.getElementById(STYLE_ID) !== null) return;
-  const ids = ["openmw-group", "openmw-subgroup"];
+  const ids = ["openmw-group", "openmw-subgroup", "openmw-sorting-group"];
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = ids
@@ -72,12 +73,47 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     });
   };
 
-  const setGroup = (mod: IModRow, group: string) => {
-    const subgroups = getGroups().find((g) => g.name === group)?.subgroups ?? [];
-    // a subgroup only makes sense within its own group
-    const keep = subgroups.some((s) => s.name === attrOf(mod, SUBGROUP_ATTR));
-    setAttrs(mod, keep ? { [GROUP_ATTR]: group } : { [GROUP_ATTR]: group, [SUBGROUP_ATTR]: "" });
+  const subgroupsOf = (groups: IGroup[], group: string): ISubgroup[] =>
+    groups.find((g) => g.name === group)?.subgroups ?? [];
+
+  const sortingGroupsOf = (groups: IGroup[], group: string, subgroup: string): ISubgroup[] =>
+    subgroupsOf(groups, group).find((s) => s.name === subgroup)?.sortingGroups ?? [];
+
+  /**
+   * The group, subgroup and sorting group with the ones that don't exist any more removed. A
+   * subgroup only makes sense within its group, a sorting group within its subgroup.
+   */
+  const validValues = (
+    groups: IGroup[],
+    values: { [attr: string]: string },
+  ): { [attr: string]: string } => {
+    const group = values[GROUP_ATTR] ?? "";
+    const subgroup = values[SUBGROUP_ATTR] ?? "";
+    const sorting = values[SORTING_ATTR] ?? "";
+    const g = groups.some((x) => x.name === group) ? group : "";
+    const s = g !== "" && subgroupsOf(groups, g).some((x) => x.name === subgroup) ? subgroup : "";
+    const o = s !== "" && sortingGroupsOf(groups, g, s).some((x) => x.name === sorting) ? sorting : "";
+    return { [GROUP_ATTR]: g, [SUBGROUP_ATTR]: s, [SORTING_ATTR]: o };
   };
+
+  const valuesOf = (mod: IModRow): { [attr: string]: string } => ({
+    [GROUP_ATTR]: attrOf(mod, GROUP_ATTR),
+    [SUBGROUP_ATTR]: attrOf(mod, SUBGROUP_ATTR),
+    [SORTING_ATTR]: attrOf(mod, SORTING_ATTR),
+  });
+
+  /** Sets one of the three values and clears the ones below it that don't fit any more. */
+  const setValue = (mod: IModRow, key: string, value: string) => {
+    const values = { ...valuesOf(mod), [key]: value };
+    const valid = validValues(getGroups(), values);
+    const changed: { [key: string]: string } = {};
+    Object.keys(valid).forEach((k) => {
+      if (k === key || valid[k] !== attrOf(mod, k)) changed[k] = valid[k]!;
+    });
+    setAttrs(mod, changed);
+  };
+
+  const setGroup = (mod: IModRow, group: string) => setValue(mod, GROUP_ATTR, group);
 
   // Position in the load order of the groups: empty first, then the order of the groups
   const rank = (names: string[], name: string): number => {
@@ -86,8 +122,9 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     return idx === -1 ? names.length : idx;
   };
 
-  // Position of every mod within its group+subgroup, following the "before"/"after" rules between
-  // mods of that same subgroup (rules to mods in other subgroups are ignored). Rules only give a
+  // Position of every mod within its group+subgroup+sorting group, following the "before"/"after"
+  // rules between mods of that same sorting group (rules to mods elsewhere are ignored, those
+  // are ordered by their groups). Rules only give a
   // partial order and a comparator only sees two mods at a time, so the whole order is calculated
   // once and reused until the mods change.
   const ruleOrder: { mods: unknown; positions: Map<string, number> } = {
@@ -108,7 +145,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
 
     const buckets = new Map<string, string[]>();
     Object.keys(mods).forEach((id) => {
-      const key = `${attrOf(mods[id], GROUP_ATTR)}\u0000${attrOf(mods[id], SUBGROUP_ATTR)}`;
+      const key = [GROUP_ATTR, SUBGROUP_ATTR, SORTING_ATTR].map((a) => attrOf(mods[id], a)).join("\u0000");
       buckets.set(key, [...(buckets.get(key) ?? []), id]);
     });
 
@@ -156,8 +193,9 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     return positions;
   };
 
-  // Used by both columns: sort by group order, by subgroup order within the same group and, within
-  // the same subgroup, by the load order rules between the mods.
+  // Used by all three columns: sort by group order, by subgroup order within the same group, by
+  // sorting group order within the same subgroup and, within the same sorting group, by the load
+  // order rules between the mods.
   const sortByGroupOrder = (lhs: IModRow, rhs: IModRow): number => {
     const groups = sortGroups(getGroups());
     const groupNames = groups.map((g) => g.name);
@@ -174,29 +212,31 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     if (lhsSub !== rhsSub) {
       return rank(subgroupNames, lhsSub) - rank(subgroupNames, rhsSub);
     }
+    const sortingNames = sortGroups(sortingGroupsOf(groups, lhsGroup, lhsSub)).map((s) => s.name);
+    const lhsSorting = attrOf(lhs, SORTING_ATTR);
+    const rhsSorting = attrOf(rhs, SORTING_ATTR);
+    if (lhsSorting !== rhsSorting) {
+      return rank(sortingNames, lhsSorting) - rank(sortingNames, rhsSorting);
+    }
     const positions = getRuleOrder();
     return (positions.get(lhs.id) ?? 0) - (positions.get(rhs.id) ?? 0);
   };
 
-  // When groups or subgroups are deleted (or reset), clear the values mods still have for them.
+  // When groups, subgroups or sorting groups are deleted (or reset), clear the values mods still
+  // have for them.
   const clearStaleValues = () => {
     const state = context.api.getState();
     const groups = getGroups();
     const mods: { [id: string]: IModRow } = util.getSafe(state, ["persistent", "mods", gameId], {});
     const updates: any[] = [];
     Object.keys(mods).forEach((id) => {
-      const mod = mods[id]!;
-      const group = attrOf(mod, GROUP_ATTR);
-      const subgroup = attrOf(mod, SUBGROUP_ATTR);
-      const groupEntry = groups.find((g) => g.name === group);
-      if (group !== "" && groupEntry === undefined) {
-        updates.push(actions.setModAttribute(gameId, id, GROUP_ATTR, ""));
-        if (subgroup !== "") {
-          updates.push(actions.setModAttribute(gameId, id, SUBGROUP_ATTR, ""));
+      const current = valuesOf(mods[id]!);
+      const valid = validValues(groups, current);
+      Object.keys(valid).forEach((key) => {
+        if (valid[key] !== current[key]) {
+          updates.push(actions.setModAttribute(gameId, id, key, valid[key]));
         }
-      } else if (subgroup !== "" && !(groupEntry?.subgroups ?? []).some((s) => s.name === subgroup)) {
-        updates.push(actions.setModAttribute(gameId, id, SUBGROUP_ATTR, ""));
-      }
+      });
     });
     const store = context.api.store;
     if (updates.length > 0 && store !== undefined) {
@@ -267,7 +307,37 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
           options={sortGroups(group?.subgroups ?? []).map((s) => s.name)}
           disabled={mod.state === "downloaded" || group === undefined}
           noneLabel={t("(none)")}
-          onChange={(value) => setAttrs(mod, { [SUBGROUP_ATTR]: value })}
+          onChange={(value) => setValue(mod, SUBGROUP_ATTR, value)}
+        />
+      );
+    },
+    edit: {},
+  } as types.ITableAttribute);
+
+  context.registerTableAttribute("mods", {
+    id: "openmw-sorting-group",
+    name: "Sorting Group",
+    description: "OpenMW load order sorting group, within a subgroup",
+    icon: "sitemap",
+    placement: "both",
+    position: 122,
+    condition,
+    isToggleable: true,
+    isSortable: true,
+    isVolatile: true,
+    calc: (mod: IModRow) => attrOf(mod, SORTING_ATTR),
+    sortFuncRaw: sortByGroupOrder,
+    customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => {
+      const group = attrOf(mod, GROUP_ATTR);
+      const subgroup = attrOf(mod, SUBGROUP_ATTR);
+      const subgroupEntry = subgroupsOf(getGroups(), group).find((s) => s.name === subgroup);
+      return (
+        <ValueSelect
+          value={attrOf(mod, SORTING_ATTR)}
+          options={sortGroups(sortingGroupsOf(getGroups(), group, subgroup)).map((s) => s.name)}
+          disabled={mod.state === "downloaded" || subgroupEntry === undefined}
+          noneLabel={t("(none)")}
+          onChange={(value) => setValue(mod, SORTING_ATTR, value)}
         />
       );
     },
