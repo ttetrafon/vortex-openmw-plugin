@@ -1,4 +1,4 @@
-import { actions, selectors, types, util } from "@nexusmods/vortex-api";
+import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
 import type { IGroup } from "./reducers";
 import { sortGroups } from "./sort";
 
@@ -221,6 +221,16 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isToggleable: true,
     isSortable: true,
     isVolatile: true,
+    // multi-select dropdown like the one of the Category column; the options are read when it opens,
+    // so they follow edits made in the group editor. raw=false matches on the group name from calc.
+    filter: new OptionsFilter(
+      () => [
+        { value: OptionsFilter.EMPTY, label: `<${context.api.translate("Unassigned")}>` },
+        ...sortGroups(getGroups()).map((g) => ({ value: g.name, label: g.name })),
+      ],
+      true,
+      false,
+    ),
     calc: (mod: IModRow) => attrOf(mod, GROUP_ATTR),
     sortFuncRaw: sortByGroupOrder,
     // 'customRenderer' is required to repopulate the `subgroup` dropdown when the `group` changes
