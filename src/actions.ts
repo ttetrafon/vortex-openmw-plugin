@@ -47,3 +47,7 @@ export const setPluginRules = make(
   (modId: string, rules: { [plugin: string]: string[] } | undefined) => ({ modId, rules }),
 );
 export const resetGroups = make("OPENMW_RESET_GROUPS", () => undefined);
+// plugins that are used by OpenMW but don't come from a mod in Vortex, in load order
+export const setExternalPlugins = make("OPENMW_SET_EXTERNAL_PLUGINS", (plugins: string[]) => plugins);
+// archives (.bsa) that OpenMW uses but that don't come from a mod in Vortex, in load order
+export const setExternalArchives = make("OPENMW_SET_EXTERNAL_ARCHIVES", (archives: string[]) => archives);

@@ -1,10 +1,8 @@
 import { actions, OptionsFilter, selectors, types, util } from "@nexusmods/vortex-api";
 import type { IGroup, ISubgroup } from "./reducers";
+import { attrOf, getModPositions, GROUP_ATTR, SORTING_ATTR, SUBGROUP_ATTR } from "./order";
 import { sortGroups } from "./sort";
 
-const GROUP_ATTR = "openmwGroup";
-const SUBGROUP_ATTR = "openmwSubgroup";
-const SORTING_ATTR = "openmwSortingGroup";
 
 const MIN_COLUMN_WIDTH = 220;
 const STYLE_ID = "openmw-group-columns-style";
@@ -63,8 +61,6 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
 
   const getGroups = (): IGroup[] =>
     util.getSafe(context.api.getState(), ["persistent", "openmw", "groups"], []);
-
-  const attrOf = (mod: IModRow, key: string): string => mod?.attributes?.[key] ?? "";
 
   const getDownloads = (): { [archiveId: string]: any } =>
     util.getSafe(context.api.getState(), ["persistent", "downloads", "files"], {});
@@ -159,75 +155,9 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     return idx === -1 ? names.length : idx;
   };
 
-  // Position of every mod within its group+subgroup+sorting group, following the "before"/"after"
-  // rules between mods of that same sorting group (rules to mods elsewhere are ignored, those
-  // are ordered by their groups). Rules only give a
-  // partial order and a comparator only sees two mods at a time, so the whole order is calculated
-  // once and reused until the mods change.
-  const ruleOrder: { mods: unknown; positions: Map<string, number> } = {
-    mods: undefined,
-    positions: new Map(),
-  };
-
-  const modName = (mod: any, id: string): string =>
-    String(mod?.attributes?.customFileName ?? mod?.attributes?.logicalFileName ?? mod?.attributes?.name ?? id).toLowerCase();
-
-  const getRuleOrder = (): Map<string, number> => {
-    const mods: { [id: string]: any } = util.getSafe(
-      context.api.getState(),
-      ["persistent", "mods", gameId],
-      {},
-    );
-    if (ruleOrder.mods === mods) return ruleOrder.positions;
-
-    const buckets = new Map<string, string[]>();
-    Object.keys(mods).forEach((id) => {
-      const key = [GROUP_ATTR, SUBGROUP_ATTR, SORTING_ATTR].map((a) => attrOf(mods[id], a)).join("\u0000");
-      buckets.set(key, [...(buckets.get(key) ?? []), id]);
-    });
-
-    const positions = new Map<string, number>();
-    buckets.forEach((unsorted) => {
-      const ids = [...unsorted].sort((lhs, rhs) => modName(mods[lhs], lhs).localeCompare(modName(mods[rhs], rhs)));
-      // edges[a] = mods that have to load after a
-      const edges = new Map<string, Set<string>>(ids.map((id) => [id, new Set<string>()]));
-      const incoming = new Map<string, number>(ids.map((id) => [id, 0]));
-      const addEdge = (from: string, to: string) => {
-        if (from === to || edges.get(from)!.has(to)) return;
-        edges.get(from)!.add(to);
-        incoming.set(to, incoming.get(to)! + 1);
-      };
-      ids.forEach((id) => {
-        (mods[id]?.rules ?? []).forEach((rule: any) => {
-          if (rule.ignored || (rule.type !== "before" && rule.type !== "after")) return;
-          ids.forEach((otherId) => {
-            if (otherId !== id && util.testModReference(mods[otherId], rule.reference)) {
-              if (rule.type === "before") addEdge(id, otherId);
-              else addEdge(otherId, id);
-            }
-          });
-        });
-      });
-
-      // Always taking the first available mod by name so unrelated mods stay in a stable order
-      const done = new Set<string>();
-      const ordered: string[] = [];
-      while (ordered.length < ids.length) {
-        const next =
-          ids.find((id) => !done.has(id) && incoming.get(id) === 0) ??
-          // a cycle in the rules, break it at the first remaining mod
-          ids.find((id) => !done.has(id))!;
-        done.add(next);
-        ordered.push(next);
-        edges.get(next)!.forEach((to) => incoming.set(to, incoming.get(to)! - 1));
-      }
-      ordered.forEach((id, idx) => positions.set(id, idx));
-    });
-
-    ruleOrder.mods = mods;
-    ruleOrder.positions = positions;
-    return positions;
-  };
+  // Position of every mod within its sorting group, see getModPositions
+  const getRuleOrder = (): Map<string, number> =>
+    getModPositions(util.getSafe(context.api.getState(), ["persistent", "mods", gameId], {}));
 
   // Used by all three columns: sort by group order, by subgroup order within the same group, by
   // sorting group order within the same subgroup and, within the same sorting group, by the load

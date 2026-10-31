@@ -94,6 +94,10 @@ export const groupsReducer: types.IReducerSpec = {
         list.map((g) => (g.name === group ? { ...g, after: g.after.filter((a) => a !== after) } : g)),
       ),
     [actions.resetGroups as any]: (state) => util.setSafe(state, ["groups"], defaultGroups),
+    [actions.setExternalPlugins as any]: (state, plugins: string[]) =>
+      util.setSafe(state, ["external"], plugins),
+    [actions.setExternalArchives as any]: (state, archives: string[]) =>
+      util.setSafe(state, ["externalArchives"], archives),
     [actions.setPluginRules as any]: (state, { modId, rules }) =>
       rules === undefined
         ? util.deleteOrNop(state, ["pluginRules", modId])
@@ -103,6 +107,10 @@ export const groupsReducer: types.IReducerSpec = {
     groups: defaultGroups,
     // per mod: the plugin files that load before each plugin file of that mod
     pluginRules: {},
+    // plugin files used by OpenMW that don't come from a mod in Vortex, in load order
+    external: [],
+    // archives used by OpenMW that don't come from a mod in Vortex, in load order
+    externalArchives: [],
   },
 };
 

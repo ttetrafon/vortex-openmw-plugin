@@ -4,6 +4,8 @@ import { openGroupEditor } from "./actions";
 import { registerGroupColumns } from "./groups/columns";
 import GroupEditor from "./groups/GroupEditor";
 import { groupsReducer, sessionReducer } from "./groups/reducers";
+import { importLoadOrder } from "./openmw/importLoadOrder";
+import OpenMWPage from "./openmw/OpenMWPage";
 import PluginEditor from "./plugins/PluginEditor";
 import { registerPluginColumn } from "./plugins/column";
 import reducer from "./reducers";
@@ -32,6 +34,32 @@ function init(context: types.IExtensionContext) {
 
   context.registerDialog("openmw-plugin-editor", PluginEditor, () => ({ gameId: MORROWIND_ID }));
   registerPluginColumn(context, MORROWIND_ID);
+
+  // The load order is also imported when Vortex starts, without any notifications
+  context.once(() => {
+    void importLoadOrder(context.api, MORROWIND_ID, { silent: true });
+  });
+
+  // Button in the toolbar of the OpenMW page
+  context.registerAction(
+    "openmw-icons",
+    100,
+    "import",
+    {},
+    "Import Load Order",
+    () => {
+      void importLoadOrder(context.api, MORROWIND_ID);
+    },
+  );
+
+  // The "OpenMW" page, a tab of its own that uses the icon of the Plugins page.
+  context.registerMainPage("plugins", "OpenMW", OpenMWPage, {
+    id: "openmw-plugins-page",
+    group: "per-game",
+    priority: 35,
+    visible: () => selectors.activeGameId(context.api.getState()) === MORROWIND_ID,
+    props: () => ({ gameId: MORROWIND_ID }),
+  });
 
   // Button in the Mods page toolbar ("..." menu), only while Morrowind is the active game.
   context.registerAction(
