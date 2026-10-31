@@ -8,6 +8,7 @@ const info: object = {
   author: packageJson.author,
   description: packageJson.description,
   engines: packageJson.engines,
+  modId: packageJson.modId,
 };
 
 fs.writeFileSync(

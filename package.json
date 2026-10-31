@@ -1,14 +1,15 @@
 {
   "name": "vortex-openmw-morrowind-extension",
-  "version": "0.0.21",
+  "version": "0.0.23",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
-  "homepage": "https://github.com/ttetrafon/vortex-openmw-plugin",
   "type": "module",
   "license": "MIT",
   "contributors": [
     "ttetrafon"
   ],
+  "homepage": "https://github.com/ttetrafon/vortex-openmw-plugin",
+  "modId": "0",
   "repository": {
     "type": "git",
     "url": "https://github.com/ttetrafon/vortex-openmw-plugin.git"
@@ -47,6 +48,8 @@
     "synchronise-dependencies": "node ./scripts/synchronise-dependencies.ts",
     "deploy-test-extension": "xcopy /E /I /Y dist\\src\\* \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
     "remove-test-extension": "rmdir /s /q \"C:/Games/Vortex/resources/app.asar.unpacked/bundledPlugins/game-openmw/\"",
-    "test-package": "pnpm run remove-test-extension && pnpm run cleanup && pnpm run build && pnpm run build-info && pnpm run deploy-test-extension"
+    "test-package": "pnpm run remove-test-extension && pnpm run cleanup && pnpm run build && pnpm run build-info && pnpm run deploy-test-extension",
+    "pack-extension": "node ./scripts/package-extension.ts",
+    "package": "pnpm run cleanup && pnpm run build && pnpm run build-info && pnpm run pack-extension"
   }
 }
