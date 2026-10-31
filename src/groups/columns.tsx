@@ -1,17 +1,13 @@
 import { actions, selectors, types, util } from "@nexusmods/vortex-api";
-import React from "react";
-
 import type { IGroup } from "./reducers";
 import { sortGroups } from "./sort";
 
 const GROUP_ATTR = "openmwGroup";
 const SUBGROUP_ATTR = "openmwSubgroup";
 
-// The table sizes columns by their content, which leaves the dropdowns too narrow to read.
 const MIN_COLUMN_WIDTH = 220;
 const STYLE_ID = "openmw-group-columns-style";
 
-// a mod row as the mods table hands it to us
 interface IModRow {
   id: string;
   state?: string;
@@ -60,7 +56,6 @@ function ValueSelect(props: ISelectProps) {
   );
 }
 
-/** Adds the "Group" and "Subgroup" columns to the mods table of the given game. */
 export function registerGroupColumns(context: types.IExtensionContext, gameId: string) {
   context.once(injectColumnStyle);
 
@@ -84,10 +79,137 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     setAttrs(mod, keep ? { [GROUP_ATTR]: group } : { [GROUP_ATTR]: group, [SUBGROUP_ATTR]: "" });
   };
 
+  // Position in the load order of the groups: empty first, then the order of the groups
+  const rank = (names: string[], name: string): number => {
+    if (name === "") return -1;
+    const idx = names.indexOf(name);
+    return idx === -1 ? names.length : idx;
+  };
+
+  // Position of every mod within its group+subgroup, following the "before"/"after" rules between
+  // mods of that same subgroup (rules to mods in other subgroups are ignored). Rules only give a
+  // partial order and a comparator only sees two mods at a time, so the whole order is calculated
+  // once and reused until the mods change.
+  const ruleOrder: { mods: unknown; positions: Map<string, number> } = {
+    mods: undefined,
+    positions: new Map(),
+  };
+
+  const modName = (mod: any, id: string): string =>
+    String(mod?.attributes?.customFileName ?? mod?.attributes?.logicalFileName ?? mod?.attributes?.name ?? id).toLowerCase();
+
+  const getRuleOrder = (): Map<string, number> => {
+    const mods: { [id: string]: any } = util.getSafe(
+      context.api.getState(),
+      ["persistent", "mods", gameId],
+      {},
+    );
+    if (ruleOrder.mods === mods) return ruleOrder.positions;
+
+    const buckets = new Map<string, string[]>();
+    Object.keys(mods).forEach((id) => {
+      const key = `${attrOf(mods[id], GROUP_ATTR)}\u0000${attrOf(mods[id], SUBGROUP_ATTR)}`;
+      buckets.set(key, [...(buckets.get(key) ?? []), id]);
+    });
+
+    const positions = new Map<string, number>();
+    buckets.forEach((unsorted) => {
+      const ids = [...unsorted].sort((lhs, rhs) => modName(mods[lhs], lhs).localeCompare(modName(mods[rhs], rhs)));
+      // edges[a] = mods that have to load after a
+      const edges = new Map<string, Set<string>>(ids.map((id) => [id, new Set<string>()]));
+      const incoming = new Map<string, number>(ids.map((id) => [id, 0]));
+      const addEdge = (from: string, to: string) => {
+        if (from === to || edges.get(from)!.has(to)) return;
+        edges.get(from)!.add(to);
+        incoming.set(to, incoming.get(to)! + 1);
+      };
+      ids.forEach((id) => {
+        (mods[id]?.rules ?? []).forEach((rule: any) => {
+          if (rule.ignored || (rule.type !== "before" && rule.type !== "after")) return;
+          ids.forEach((otherId) => {
+            if (otherId !== id && util.testModReference(mods[otherId], rule.reference)) {
+              if (rule.type === "before") addEdge(id, otherId);
+              else addEdge(otherId, id);
+            }
+          });
+        });
+      });
+
+      // Kahn's algorithm, always taking the first available mod by name so unrelated mods stay
+      // in a stable order
+      const done = new Set<string>();
+      const ordered: string[] = [];
+      while (ordered.length < ids.length) {
+        const next =
+          ids.find((id) => !done.has(id) && incoming.get(id) === 0) ??
+          // a cycle in the rules, break it at the first remaining mod
+          ids.find((id) => !done.has(id))!;
+        done.add(next);
+        ordered.push(next);
+        edges.get(next)!.forEach((to) => incoming.set(to, incoming.get(to)! - 1));
+      }
+      ordered.forEach((id, idx) => positions.set(id, idx));
+    });
+
+    ruleOrder.mods = mods;
+    ruleOrder.positions = positions;
+    return positions;
+  };
+
+  // Used by both columns: sort by group order, by subgroup order within the same group and, within
+  // the same subgroup, by the load order rules between the mods.
+  const sortByGroupOrder = (lhs: IModRow, rhs: IModRow): number => {
+    const groups = sortGroups(getGroups());
+    const groupNames = groups.map((g) => g.name);
+    const lhsGroup = attrOf(lhs, GROUP_ATTR);
+    const rhsGroup = attrOf(rhs, GROUP_ATTR);
+    if (lhsGroup !== rhsGroup) {
+      return rank(groupNames, lhsGroup) - rank(groupNames, rhsGroup);
+    }
+    const subgroupNames = sortGroups(groups.find((g) => g.name === lhsGroup)?.subgroups ?? []).map(
+      (s) => s.name,
+    );
+    const lhsSub = attrOf(lhs, SUBGROUP_ATTR);
+    const rhsSub = attrOf(rhs, SUBGROUP_ATTR);
+    if (lhsSub !== rhsSub) {
+      return rank(subgroupNames, lhsSub) - rank(subgroupNames, rhsSub);
+    }
+    const positions = getRuleOrder();
+    return (positions.get(lhs.id) ?? 0) - (positions.get(rhs.id) ?? 0);
+  };
+
+  // When groups or subgroups are deleted (or reset), clear the values mods still have for them.
+  const clearStaleValues = () => {
+    const state = context.api.getState();
+    const groups = getGroups();
+    const mods: { [id: string]: IModRow } = util.getSafe(state, ["persistent", "mods", gameId], {});
+    const updates: any[] = [];
+    Object.keys(mods).forEach((id) => {
+      const mod = mods[id]!;
+      const group = attrOf(mod, GROUP_ATTR);
+      const subgroup = attrOf(mod, SUBGROUP_ATTR);
+      const groupEntry = groups.find((g) => g.name === group);
+      if (group !== "" && groupEntry === undefined) {
+        updates.push(actions.setModAttribute(gameId, id, GROUP_ATTR, ""));
+        if (subgroup !== "") {
+          updates.push(actions.setModAttribute(gameId, id, SUBGROUP_ATTR, ""));
+        }
+      } else if (subgroup !== "" && !(groupEntry?.subgroups ?? []).some((s) => s.name === subgroup)) {
+        updates.push(actions.setModAttribute(gameId, id, SUBGROUP_ATTR, ""));
+      }
+    });
+    const store = context.api.store;
+    if (updates.length > 0 && store !== undefined) {
+      util.batchDispatch(store, updates);
+    }
+  };
+
+  context.once(() => {
+    context.api.onStateChange?.(["persistent", "openmw", "groups"], clearStaleValues);
+  });
+
   const condition = () => selectors.activeGameId(context.api.getState()) === gameId;
 
-  // A custom renderer (unlike "edit.choices") is redrawn whenever the row changes, which is needed
-  // for the subgroup options to follow the group of the same row.
   context.registerTableAttribute("mods", {
     id: "openmw-group",
     name: "Group",
@@ -100,6 +222,8 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isSortable: true,
     isVolatile: true,
     calc: (mod: IModRow) => attrOf(mod, GROUP_ATTR),
+    sortFuncRaw: sortByGroupOrder,
+    // 'customRenderer' is required to repopulate the `subgroup` dropdown when the `group` changes
     customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => (
       <ValueSelect
         value={attrOf(mod, GROUP_ATTR)}
@@ -124,6 +248,7 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
     isSortable: true,
     isVolatile: true,
     calc: (mod: IModRow) => attrOf(mod, SUBGROUP_ATTR),
+    sortFuncRaw: sortByGroupOrder,
     customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => {
       const group = getGroups().find((g) => g.name === attrOf(mod, GROUP_ATTR));
       return (
