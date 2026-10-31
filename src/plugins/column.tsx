@@ -45,7 +45,7 @@ export function registerPluginColumn(context: types.IExtensionContext, gameId: s
     },
     customRenderer: (mod: IModRow, _detail: boolean, t: (s: string) => string) => {
       // no button at all for mods without plugin files (or until the scan has found some)
-      if ((getCachedPlugins(mod.id) ?? []).length === 0) {
+      if ((getCachedPlugins(mod.id) ?? []).length < 2) {
         return <></>;
       }
       return (
