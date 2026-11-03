@@ -72,6 +72,7 @@ function PluginEditor(props: IProps) {
           id="openmw-plugins"
           groups={nodes}
           label={pluginBaseName}
+          vertical
           onAddRule={(plugin, before) => save({ [plugin]: [...after(plugin), before] })}
           onRemoveRule={(plugin, before) => save({ [plugin]: after(plugin).filter((a) => a !== before) })}
         />

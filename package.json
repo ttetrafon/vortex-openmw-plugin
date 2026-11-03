@@ -1,6 +1,6 @@
 {
   "name": "vortex-openmw-morrowind-extension",
-  "version": "0.0.26",
+  "version": "0.0.27",
   "author": "ttetrafon",
   "description": "Support modding of OpenMW through Vortex",
   "type": "module",
