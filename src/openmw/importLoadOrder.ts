@@ -4,6 +4,7 @@ import path from "path";
 import { setCurrentProfile, setExternalArchives, setExternalPlugins } from "../actions";
 import { getCachedArchives, pluginBaseName, scanMod } from "../plugins/scan";
 import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault } from "../data/defaults";
+import { dataDirectories, localDataDirectory, scanDataDirectories } from "./dataDirectories";
 import { readActivePlugins } from "./launcherCfg";
 
 // The data= lines of the profile that was imported last. They are copied as they are when the
@@ -15,8 +16,10 @@ export function getImportedData(): string[] | undefined {
 }
 
 /**
- * Reads the active plugins and archives of the current OpenMW profile and keeps the ones that don't
- * come from any mod installed in Vortex as "External", in the order of launcher.cfg.
+ * Looks for the plugins in the data folders (the `data=` lines, and the local data folder) of the current OpenMW profile and
+ * keeps the ones that no mod installed in Vortex has as "External". A plugin that a mod has is not
+ * kept, the page lists it with its mod if that has a group, and leaves it out if not. The archives
+ * of the profile are read from its `fallback-archive=` lines.
  */
 export async function importLoadOrder(
   api: types.IExtensionApi,
@@ -84,8 +87,19 @@ export async function importLoadOrder(
     );
   }
 
+  // the plugins that are really there: the files in the data folders, not what launcher.cfg lists
+  // The data folders of the profile, and the local one that OpenMW always has after them. The
+  // data= lines themselves are exported as they are, the local folder is not one of them.
+  const folders = [...dataDirectories(active.data), await localDataDirectory(settingsDir)];
+  const { plugins: found, unreadable } = await scanDataDirectories(
+    folders.filter((dir, idx) => folders.findIndex((other) => path.normalize(other).toLowerCase() === path.normalize(dir).toLowerCase()) === idx),
+  );
+  if (unreadable.length > 0) {
+    log("warn", "OpenMW: data folders that couldn't be read", { unreadable });
+  }
+
   // the base game files are always listed first, so they aren't kept here
-  const optional = active.plugins.filter((plugin) => !isDefault(DEFAULT_PLUGINS, plugin));
+  const optional = found.filter((plugin) => !isDefault(DEFAULT_PLUGINS, plugin));
   const optionalArchives = active.archives.filter((archive) => !isDefault(DEFAULT_ARCHIVES, archive));
   const external = optional.filter((plugin) => !known.has(plugin.toLowerCase()));
   // archives of the profile that no mod provides, the ones of mods are found when showing the list
@@ -98,7 +112,7 @@ export async function importLoadOrder(
     type: "success",
     message: `Profile '${active.profile}': ${external.length} external plugin(s) and ${externalArchives.length
       } external archive(s) imported, ${optional.length - external.length} plugin(s) and ${optionalArchives.length - externalArchives.length
-      } archive(s) already provided by mods in Vortex.`,
+      } archive(s) already provided by mods in Vortex.${unreadable.length > 0 ? ` ${unreadable.length} data folder(s) couldn't be read.` : ""}`,
     displayMS: 6000,
   });
 }

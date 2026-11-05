@@ -32,6 +32,11 @@ async function scan(dir: string): Promise<{ plugins: string[]; archives: string[
   }
 }
 
+/** Whether a file name is the one of a plugin (.esm, .esp, .omwaddon, .omwscripts). */
+export function isPluginFile(name: string): boolean {
+  return PLUGIN_EXTENSIONS.includes(path.extname(name).toLowerCase());
+}
+
 /** Plugin files found in the staging folder of the mod, `undefined` while that isn't known yet. */
 export function getCachedPlugins(modId: string): string[] | undefined {
   return results.get(modId)?.plugins;
