@@ -1,6 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 
+import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault, withDefaults } from "../data/defaults";
+
 export interface IActivePlugins {
   /** the profile named by `currentprofile`, `undefined` if the file doesn't have one */
   profile: string | undefined;
@@ -131,6 +133,46 @@ export function writeProfile(text: string, name: string, content: IProfileConten
   }
 
   return (hadBom ? "\uFEFF" : "") + kept.join(eol) + (endsWithEol ? eol : "");
+}
+
+/**
+ * Returns the text of openmw.cfg with its `data=`, `content=` and `fallback-archive=` lines replaced
+ * by `content`, which is what the OpenMW launcher writes there when it starts the game (and compares
+ * with the current profile when it starts, creating a new profile if they differ). The archives of
+ * the base game stay where they are (before the `fallback=` lines), the new lines follow the
+ * `encoding=` line like the launcher does, or the end of the file if there is none. Plugins of the
+ * base game are written first. Every other line is kept.
+ */
+export function writeOpenmwCfg(text: string, content: IProfileContent): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const hadBom = text.startsWith("﻿");
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  const endsWithEol = lines.length > 0 && lines[lines.length - 1] === "";
+  if (endsWithEol) lines.pop();
+
+  const kept = lines.filter((line) => {
+    const match = /^\s*(data|content|fallback-archive)\s*=(.*)$/i.exec(line);
+    if (!match) return true;
+    // the archives of the base game are written by the launcher before the fallback= lines, keep them
+    return match[1]!.toLowerCase() === "fallback-archive" && isDefault(DEFAULT_ARCHIVES, match[2]!.trim());
+  });
+
+  const block = [
+    ...content.data.map((data) => `data=${data}`),
+    ...content.archives
+      .filter((archive) => !isDefault(DEFAULT_ARCHIVES, archive))
+      .map((archive) => `fallback-archive=${archive}`),
+    ...withDefaults(DEFAULT_PLUGINS, content.plugins).map((plugin) => `content=${plugin}`),
+  ];
+
+  let at = -1;
+  kept.forEach((line, idx) => {
+    if (/^\s*encoding\s*=/i.test(line)) at = idx;
+  });
+  if (at === -1) kept.push(...block);
+  else kept.splice(at + 1, 0, ...block);
+
+  return (hadBom ? "﻿" : "") + kept.join(eol) + (endsWithEol || at === -1 ? eol : "");
 }
 
 /** Whether launcher.cfg has any entry of the profile `name`. */

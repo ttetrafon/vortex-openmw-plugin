@@ -53,8 +53,9 @@ export async function localDataDirectory(settingsDir: string): Promise<string> {
  */
 export async function scanDataDirectories(
   dirs: string[],
-): Promise<{ plugins: string[]; unreadable: string[] }> {
+): Promise<{ plugins: string[]; archives: string[]; unreadable: string[] }> {
   const plugins: string[] = [];
+  const archives: string[] = [];
   const unreadable: string[] = [];
   const seen = new Set<string>();
   for (const dir of dirs) {
@@ -76,6 +77,10 @@ export async function scanDataDirectories(
           plugins.push(name);
         }
       });
+    // the archives (.bsa) directly in the folder, to tell which ones of launcher.cfg still exist
+    entries
+      .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && path.extname(entry.name).toLowerCase() === ".bsa")
+      .forEach((entry) => archives.push(entry.name));
   }
-  return { plugins, unreadable };
+  return { plugins, archives, unreadable };
 }

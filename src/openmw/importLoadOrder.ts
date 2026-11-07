@@ -91,7 +91,7 @@ export async function importLoadOrder(
   // The data folders of the profile, and the local one that OpenMW always has after them. The
   // data= lines themselves are exported as they are, the local folder is not one of them.
   const folders = [...dataDirectories(active.data), await localDataDirectory(settingsDir)];
-  const { plugins: found, unreadable } = await scanDataDirectories(
+  const { plugins: found, archives: foundArchives, unreadable } = await scanDataDirectories(
     folders.filter((dir, idx) => folders.findIndex((other) => path.normalize(other).toLowerCase() === path.normalize(dir).toLowerCase()) === idx),
   );
   if (unreadable.length > 0) {
@@ -100,7 +100,12 @@ export async function importLoadOrder(
 
   // the base game files are always listed first, so they aren't kept here
   const optional = found.filter((plugin) => !isDefault(DEFAULT_PLUGINS, plugin));
-  const optionalArchives = active.archives.filter((archive) => !isDefault(DEFAULT_ARCHIVES, archive));
+  // Like the plugins, an archive only counts if the file is in a data folder. launcher.cfg keeps
+  // listing the archive of a mod that was removed since the last export.
+  const archivesOnDisk = new Set(foundArchives.map((archive) => archive.toLowerCase()));
+  const optionalArchives = active.archives.filter(
+    (archive) => !isDefault(DEFAULT_ARCHIVES, archive) && archivesOnDisk.has(pluginBaseName(archive).toLowerCase()),
+  );
   const external = optional.filter((plugin) => !known.has(plugin.toLowerCase()));
   // archives of the profile that no mod provides, the ones of mods are found when showing the list
   const externalArchives = optionalArchives.filter((archive) => !knownArchives.has(archive.toLowerCase()));

@@ -4,7 +4,7 @@ import path from "path";
 
 import { setCurrentProfile } from "../actions";
 import { getImportedData } from "./importLoadOrder";
-import { parseActivePlugins, writeProfile } from "./launcherCfg";
+import { parseActivePlugins, writeOpenmwCfg, writeProfile } from "./launcherCfg";
 
 /** Name of the profile in launcher.cfg that is written by the export. */
 export const EXPORT_PROFILE = "Vortex";
@@ -22,8 +22,9 @@ export function setLoadOrder(loadOrder: ILoadOrder) {
 }
 
 /**
- * Writes the archives and plugins of the OpenMW page as the profile "Vortex" of launcher.cfg and
- * makes it the current profile.
+ * Writes the archives and plugins of the OpenMW page as the profile "Vortex" of launcher.cfg, makes
+ * it the current profile and updates the data=, content= and fallback-archive= lines of openmw.cfg
+ * to match.
  */
 export async function exportLoadOrder(api: types.IExtensionApi): Promise<void> {
   const warn = (id: string, message: string) =>
@@ -50,7 +51,22 @@ export async function exportLoadOrder(api: types.IExtensionApi): Promise<void> {
     const backup = `${file}.vortex-backup`;
     await fs.copyFile(file, backup, 1 /* COPYFILE_EXCL: don't overwrite an older backup */).catch(() => undefined);
 
-    await fs.writeFile(file, writeProfile(text, EXPORT_PROFILE, { data, ...latest }), "utf8");
+    const content = { data, ...latest };
+    await fs.writeFile(file, writeProfile(text, EXPORT_PROFILE, content), "utf8");
+
+    // The launcher compares openmw.cfg with the current profile when it starts, and creates a new
+    // profile from openmw.cfg if they differ, so that has to match the exported profile.
+    const openmwFile = path.join(settingsDir, "openmw.cfg");
+    let openmwText: string | undefined;
+    try {
+      openmwText = await fs.readFile(openmwFile, "utf8");
+    } catch {
+      warn("openmw-export-no-openmw-cfg", `No openmw.cfg found in '${settingsDir}', only launcher.cfg was updated.`);
+    }
+    if (openmwText !== undefined) {
+      await fs.copyFile(openmwFile, `${openmwFile}.vortex-backup`, 1).catch(() => undefined);
+      await fs.writeFile(openmwFile, writeOpenmwCfg(openmwText, content), "utf8");
+    }
     // launcher.cfg names this profile as the current one now
     api.store?.dispatch(setCurrentProfile(EXPORT_PROFILE) as any);
     api.sendNotification?.({
