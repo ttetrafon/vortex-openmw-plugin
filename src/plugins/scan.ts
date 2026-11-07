@@ -13,6 +13,8 @@ interface IScanResult {
   plugins: string[];
   /** archive (.bsa) files, relative to the staging folder with "/" as separator */
   archives: string[];
+  /** the staging folder may have changed since, the next scan looks again (the old result is shown until then) */
+  stale?: boolean;
 }
 
 const results = new Map<string, IScanResult>();
@@ -53,7 +55,7 @@ export function getCachedArchives(modId: string): string[] | undefined {
  */
 export function scanMod(modId: string, dir: string): Promise<string[]> {
   const cached = results.get(modId);
-  if (cached !== undefined && cached.dir === dir) {
+  if (cached !== undefined && cached.dir === dir && cached.stale !== true) {
     return Promise.resolve(cached.plugins);
   }
   const key = `${modId}|${dir}`;
@@ -68,6 +70,33 @@ export function scanMod(modId: string, dir: string): Promise<string[]> {
     pending.set(key, running);
   }
   return running.then((result) => result.plugins);
+}
+
+let resetCount = 0;
+const resetListeners = new Set<() => void>();
+
+/** Incremented whenever `markAllStale` was called, for effects that have to scan again. */
+export function getResetCount(): number {
+  return resetCount;
+}
+
+/** `listener` is called after `markAllStale`. Returns the function that removes it again. */
+export function onScanReset(listener: () => void): () => void {
+  resetListeners.add(listener);
+  return () => resetListeners.delete(listener);
+}
+
+/**
+ * Every mod is scanned again the next time it is asked for, because files in the staging folders
+ * can have been removed or added without the mod being installed again, which the user sees as a
+ * deployment. What was found before stays available until the new scan has finished.
+ */
+export function markAllStale() {
+  results.forEach((result) => {
+    result.stale = true;
+  });
+  ++resetCount;
+  resetListeners.forEach((listener) => listener());
 }
 
 /** Forget what was found for a mod, e.g. because it was installed again. */

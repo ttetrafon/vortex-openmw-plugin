@@ -2,7 +2,7 @@ import { selectors, tooltip, types } from "@nexusmods/vortex-api";
 import path from "path";
 
 import { openPluginEditor } from "../actions";
-import { forgetMod, getCachedPlugins, scanMod } from "./scan";
+import { forgetMod, getCachedPlugins, markAllStale, scanMod } from "./scan";
 
 const VIconButton = tooltip.IconButton as any;
 
@@ -25,6 +25,12 @@ export function registerPluginColumn(context: types.IExtensionContext, gameId: s
     context.api.events.on("did-install-mod", (installedGame: string, _archiveId: string, modId: string) => {
       if (installedGame === gameId) forgetMod(modId);
     });
+    // files can be removed from or added to the staging folders, the next deployment applies that
+    const rescan = () => {
+      if (selectors.activeGameId(context.api.getState()) === gameId) markAllStale();
+    };
+    context.api.events.on("did-deploy", rescan);
+    context.api.events.on("did-purge", rescan);
   });
 
   context.registerTableAttribute("mods", {

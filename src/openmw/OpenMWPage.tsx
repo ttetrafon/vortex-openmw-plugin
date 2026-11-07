@@ -12,7 +12,7 @@ import type { IGroup, ISubgroup } from "../groups/reducers";
 import { sortGroups } from "../groups/sort";
 import ValueSelect from "../groups/ValueSelect";
 import { DEFAULT_ARCHIVES, DEFAULT_PLUGINS, isDefault, withDefaults } from "../data/defaults";
-import { getCachedArchives, getCachedPlugins, orderPlugins, pluginBaseName, scanMod } from "../plugins/scan";
+import { getCachedArchives, getCachedPlugins, getResetCount, onScanReset, orderPlugins, pluginBaseName, scanMod } from "../plugins/scan";
 
 const VMainPage = MainPage as any;
 const VIconBar = IconBar as any;
@@ -100,7 +100,10 @@ function OpenMWPage(props: IProps) {
   );
 
   // The plugin files are found by looking into the staging folders, the list is drawn again once that is done.
-  const [, setScanned] = React.useState(0);
+  const [scanned, setScanned] = React.useState(0);
+  // a deployment can change the files in the staging folders, then everything is scanned again
+  const [resets, setResets] = React.useState(getResetCount());
+  React.useEffect(() => onScanReset(() => setResets(getResetCount())), []);
   React.useEffect(() => {
     if (installPath === undefined) return;
     let cancelled = false;
@@ -116,7 +119,7 @@ function OpenMWPage(props: IProps) {
     return () => {
       cancelled = true;
     };
-  }, [listed.join("\n"), installPath]);
+  }, [listed.join("\n"), installPath, resets]);
 
   const { sections, masters, archives, ungrouped } = React.useMemo(() => {
     const positions = getModPositions(mods);
@@ -202,7 +205,7 @@ function OpenMWPage(props: IProps) {
     // the external plugins without a group stay in the "external" section
     const ungrouped = externalBuckets.get(["", "", ""].join("\u0000")) ?? [];
     return { sections: shown, masters, archives, ungrouped };
-  }, [mods, groups, pluginRules, listed, installPath, optionalExternal, externalSettings]);
+  }, [mods, groups, pluginRules, listed, installPath, optionalExternal, externalSettings, scanned]);
 
   const setSetting = (plugin: string, key: string, value: string) => {
     const current = externalSettings[plugin.toLowerCase()] ?? {};
