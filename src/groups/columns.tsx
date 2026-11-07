@@ -70,12 +70,16 @@ export function registerGroupColumns(context: types.IExtensionContext, gameId: s
 
   // Builds the attributes of a downloaded row from what is kept with the download. The same
   // attributes are used when the download is installed, so the mod keeps its groups.
+  // When a mod is updated, the download of the new version has no groups, so the ones of the
+  // version it replaces (`previous`, as Vortex does for the category and notes) are used then.
   context.registerAttributeExtractor(100, (input: any) => {
     const custom = input?.download?.modInfo?.custom ?? {};
+    const previous = input?.previous ?? {};
+    const pick = (key: string) => custom[key] ?? previous[key];
     return Promise.resolve({
-      [GROUP_ATTR]: custom[GROUP_ATTR],
-      [SUBGROUP_ATTR]: custom[SUBGROUP_ATTR],
-      [SORTING_ATTR]: custom[SORTING_ATTR],
+      [GROUP_ATTR]: pick(GROUP_ATTR),
+      [SUBGROUP_ATTR]: pick(SUBGROUP_ATTR),
+      [SORTING_ATTR]: pick(SORTING_ATTR),
     });
   });
 
